@@ -1,0 +1,14 @@
+import { initializeApp } from "firebase/app";
+import { getFirestore } from "firebase/firestore";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCO9_geqZzJuPDpumDShDZpyVPYKzZnrS4",
+  authDomain: "crime-detection-system-734c6.firebaseapp.com",
+  projectId: "crime-detection-system-734c6",
+  storageBucket: "crime-detection-system-734c6.firebasestorage.app",
+  messagingSenderId: "500709121041",
+  appId: "1:500709121041:web:ed970480dc4da088b7a5b0",
+};
+
+const app = initializeApp(firebaseConfig);
+export const db = getFirestore(app);
