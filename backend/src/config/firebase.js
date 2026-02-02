@@ -1,9 +1,12 @@
 const admin = require("firebase-admin");
 const serviceAccount = require("../../firebase-admin.json");
 
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+// ✅ Prevent re-initialization
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert(serviceAccount),
+  });
+}
 
 const db = admin.firestore();
 
