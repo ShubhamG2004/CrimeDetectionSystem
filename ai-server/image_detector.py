@@ -1,175 +1,181 @@
 """
-AI SERVER - Crime Detection System (YOLOv8-Pose)
-Image Upload API with Logical Post-Validation
+AI SERVER - Fixed Response Format
 """
 
 import os
 import cv2
 from datetime import datetime
 from pathlib import Path
-
+import numpy as np
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 
 from pose_detector import PoseCrimeDetector
 
-# --------------------------------------------------
-# INITIALIZE
-# --------------------------------------------------
-
 app = Flask(__name__)
 
-UPLOAD_FOLDER = "./ai_uploads"
+# CORS headers
+@app.after_request
+def add_cors_headers(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    response.headers['Access-Control-Allow-Methods'] = 'POST, GET, OPTIONS'
+    return response
+
+UPLOAD_FOLDER = "./uploads"
 ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "bmp"}
 
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 Path(UPLOAD_FOLDER).mkdir(parents=True, exist_ok=True)
 
-pose_detector = PoseCrimeDetector()
-
-# --------------------------------------------------
-# HELPERS
-# --------------------------------------------------
+# Initialize detector
+print("🔄 Loading crime detection model...")
+try:
+    detector = PoseCrimeDetector()
+    print("✅ Crime detector initialized successfully!")
+except Exception as e:
+    print(f"❌ Failed to initialize detector: {e}")
+    detector = None
 
 def allowed_file(filename):
-    return "." in filename and filename.rsplit(".", 1)[1].lower() in ALLOWED_EXTENSIONS
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-
-def normalize_confidence(raw_confidence):
-    """
-    Normalize confidence to 0.0–1.0
-    """
-    try:
-        raw_confidence = float(raw_confidence)
-        if raw_confidence > 1:
-            return min(raw_confidence / 100.0, 1.0)
-        return max(raw_confidence, 0.0)
-    except Exception:
-        return 0.0
-
-
-# --------------------------------------------------
-# CORE ANALYSIS
-# --------------------------------------------------
-
-def analyze_image(image):
-    result = pose_detector.analyze(image)
-
-    detection = {
-        "type": result.get("crime_type", "NO_CRIME"),
-        "confidence": normalize_confidence(
-            result.get("confidence", 0.0)
-        ),
-        "crime_detected": int(result.get("crime_detected", 0)),
-        "threat_level": result.get("threat_level", "LOW"),
-        "persons_detected": int(
-            result.get("persons_detected", 0)
-        ),
-        "activities": result.get("activities", []),
-        "signals": result.get("signals", []),
-    }
-
-    # --------------------------------------------------
-    # 🧠 POST-VALIDATION (CRITICAL FIX)
-    # --------------------------------------------------
-
-    crime = detection["type"]
-    persons = detection["persons_detected"]
-
-    # Crimes that REQUIRE at least 2 people
-    MULTI_PERSON_CRIMES = [
-        "FIGHT",
-        "PHYSICAL_ASSAULT",
-        "CHOKING",
-        "CHOKING / ATTEMPTED MURDER",
-    ]
-
-    # Crimes that MUST be HIGH threat
-    HIGH_THREAT_CRIMES = [
-        "CHOKING",
-        "CHOKING / ATTEMPTED MURDER",
-        "ASSAULT_WITH_WEAPON",
-        "ARMED_INTRUSION",
-        "ROBBERY",
-    ]
-
-    # ❌ Invalid crime if people < 2
-    if crime in MULTI_PERSON_CRIMES and persons < 2:
-        detection["type"] = "NO_CRIME"
-        detection["confidence"] = 0.0
-        detection["crime_detected"] = 0
-        detection["threat_level"] = "LOW"
-        detection["persons_detected"] = max(persons, 1)
-
-    # 🔴 Force HIGH threat for violent crimes
-    if detection["type"] in HIGH_THREAT_CRIMES:
-        detection["threat_level"] = "HIGH"
-
-    # 🧍 Never allow 0 people for detected crimes
-    if detection["type"] != "NO_CRIME" and detection["persons_detected"] == 0:
-        detection["persons_detected"] = 1
-
-    return detection
-
-
-# --------------------------------------------------
-# API ENDPOINT
-# --------------------------------------------------
-
-@app.route("/detect-image", methods=["POST"])
+@app.route('/detect-image', methods=['POST', 'OPTIONS'])
 def detect_image():
+    if request.method == 'OPTIONS':
+        return '', 200
+    
+    temp_filepath = None
+    
     try:
-        if "image" not in request.files:
+        if 'image' not in request.files:
             return jsonify({
+                "success": False,
+                "error": "No image file provided",
                 "type": "NO_IMAGE",
-                "confidence": 0.0,
-                "location": request.form.get("locationName", "Unknown"),
+                "confidence": 0.0
             }), 400
-
-        file = request.files["image"]
-        location = request.form.get("locationName", "Unknown")
-
-        if file.filename == "" or not allowed_file(file.filename):
+        
+        file = request.files['image']
+        location = request.form.get('location', 'Unknown').strip()
+        
+        if file.filename == '':
             return jsonify({
-                "type": "INVALID_IMAGE",
-                "confidence": 0.0,
-                "location": location,
+                "success": False,
+                "error": "No selected file",
+                "type": "NO_IMAGE",
+                "confidence": 0.0
             }), 400
-
+        
+        if not allowed_file(file.filename):
+            return jsonify({
+                "success": False,
+                "error": "File type not allowed. Use PNG, JPG, or BMP.",
+                "type": "INVALID_IMAGE",
+                "confidence": 0.0
+            }), 400
+        
+        if detector is None:
+            return jsonify({
+                "success": False,
+                "error": "Detection system is not ready",
+                "type": "SYSTEM_ERROR",
+                "confidence": 0.0
+            }), 500
+        
+        # Save file temporarily
         filename = secure_filename(file.filename)
-        filepath = os.path.join(UPLOAD_FOLDER, filename)
-        file.save(filepath)
-
-        image = cv2.imread(filepath)
+        temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], 
+                                    f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{filename}")
+        file.save(temp_filepath)
+        
+        # Read image
+        image = cv2.imread(temp_filepath)
         if image is None:
-            raise ValueError("Failed to read image")
-
-        detection = analyze_image(image)
-
-        return jsonify({
-            "type": detection["type"],
-            "confidence": round(detection["confidence"], 3),
-            "threat_level": detection["threat_level"],
-            "persons_detected": detection["persons_detected"],
-            "activities": detection["activities"],
-            "signals": detection["signals"],
+            return jsonify({
+                "success": False,
+                "error": "Could not read image file",
+                "type": "INVALID_IMAGE",
+                "confidence": 0.0
+            }), 400
+        
+        # Run detection
+        result = detector.analyze(image)
+        
+        # Debug print
+        print("\n" + "="*50)
+        print("DEBUG - Raw result from detector:")
+        print(f"Persons detected: {result.get('persons_detected')}")
+        print(f"Threat score: {result.get('threat_score')}")
+        print(f"Confidence: {result.get('confidence')}")
+        print(f"Signals: {result.get('signals')}")
+        print(f"Activities: {result.get('activities')}")
+        print("="*50 + "\n")
+        
+        # Prepare response - ensure all fields are present
+        response = {
+            "success": True,
+            "type": result.get("crime_type", "Normal"),
+            "confidence": float(result.get("confidence", 0.0)),
+            "crime_detected": bool(result.get("crime_detected", False)),
+            "threat_level": result.get("threat_level", "LOW"),
+            "persons_detected": int(result.get("persons_detected", 0)),
+            "activities": result.get("activities", []),
+            "signals": result.get("signals", []),
+            "threat_score": int(result.get("threat_score", 0)),
             "location": location,
-            "timestamp": datetime.now().isoformat(),
-        })
-
+            "timestamp": datetime.now().isoformat()
+        }
+        
+        # Log detection
+        if response["crime_detected"]:
+            print(f"🚨 CRIME DETECTED: {response['type']} at {location}")
+        else:
+            print(f"✅ Normal activity at {location}")
+        
+        print(f"   People: {response['persons_detected']}, Threat: {response['threat_level']}")
+        print(f"   Score: {response['threat_score']}, Confidence: {response['confidence']}")
+        
+        return jsonify(response)
+        
     except Exception as e:
+        print(f"Server error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
         return jsonify({
+            "success": False,
+            "error": f"Detection failed: {str(e)}",
             "type": "ERROR",
-            "confidence": 0.0,
-            "location": request.form.get("locationName", "Unknown"),
-            "error": str(e),
+            "confidence": 0.0
         }), 500
+    
+    finally:
+        # Clean up temp file
+        if temp_filepath and os.path.exists(temp_filepath):
+            try:
+                os.remove(temp_filepath)
+            except:
+                pass
 
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({
+        "status": "running",
+        "detector_ready": detector is not None,
+        "service": "crime-detection-api",
+        "timestamp": datetime.now().isoformat()
+    })
 
-# --------------------------------------------------
-# RUN SERVER
-# --------------------------------------------------
-
-if __name__ == "__main__":
-    print("\n🤖 AI CRIME DETECTION SERVER (YOLOv8-POSE)")
-    print("📡 API → http://127.0.0.1:8000/detect-image\n")
-    app.run(host="0.0.0.0", port=8000)
+if __name__ == '__main__':
+    print("\n" + "="*60)
+    print("🤖 AI CRIME DETECTION SERVER")
+    print("="*60)
+    print("📡 Endpoints:")
+    print("  POST /detect-image  - Upload image for analysis")
+    print("  GET  /health        - Health check")
+    print("\n📍 Server URL:")
+    print("  http://localhost:8000")
+    print("="*60 + "\n")
+    
+    app.run(host='0.0.0.0', port=8000, debug=False)
