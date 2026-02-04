@@ -3,7 +3,8 @@ const { db } = require("../config/firebase");
 
 /**
  * Create & save crime incident
- * Location is derived from CAMERA (primary source)
+ * 📍 Location is derived from CAMERA (primary source)
+ * 🤖 Supports AI-based detections
  */
 exports.createIncident = async (req, res) => {
   try {
@@ -12,13 +13,23 @@ exports.createIncident = async (req, res) => {
       confidence,
       cameraId,
       imageBase64,
+
+      // AI optional fields
       threat_level,
+      threat_score,
       persons_detected,
       activities,
+      signals,
+      source,
     } = req.body;
 
     // ---------------- VALIDATION ----------------
-    if (!type || confidence === undefined || !cameraId || !imageBase64) {
+    if (
+      !type ||
+      confidence === undefined ||
+      !cameraId ||
+      !imageBase64
+    ) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
@@ -26,12 +37,10 @@ exports.createIncident = async (req, res) => {
     }
 
     // ---------------- 1️⃣ UPLOAD IMAGE ----------------
-    const uploadResponse = await cloudinary.uploader.upload(
-      imageBase64,
-      {
+    const uploadResponse =
+      await cloudinary.uploader.upload(imageBase64, {
         folder: "crime-detection/incidents",
-      }
-    );
+      });
 
     // ---------------- 2️⃣ FETCH CAMERA LOCATION ----------------
     let location = {
@@ -65,19 +74,31 @@ exports.createIncident = async (req, res) => {
 
     // ---------------- 3️⃣ PREPARE INCIDENT DATA ----------------
     const incidentData = {
-      type, // e.g. ASSAULT_WITH_WEAPON
-      confidence: Number(confidence), // 0–1
+      // 🔴 Core
+      type,                                // e.g. ASSAULT_WITH_WEAPON
+      confidence: Number(confidence),      // 0.0 – 1.0
       threat_level: threat_level || "LOW",
+      threat_score: Number(threat_score || 0),
+      crime_detected: true,
+
+      // 🎥 Source
       cameraId,
+      source: source || "ai-image-detection",
 
-      location, // 📍 MAP-READY
+      // 📍 Location (MAP READY)
+      location,
 
+      // 🧠 AI Explainability
+      persons_detected: Number(persons_detected || 0),
+      activities: activities || [],
+      signals: signals || [],
+
+      // 🖼 Evidence
       imageUrl: uploadResponse.secure_url,
 
-      persons_detected: persons_detected || 0,
-      activities: activities || [],
-
+      // ⏱ Time
       timestamp: new Date(),
+      analysis_timestamp: new Date(),
     };
 
     // ---------------- 4️⃣ SAVE TO FIRESTORE ----------------
@@ -85,7 +106,7 @@ exports.createIncident = async (req, res) => {
       .collection("incidents")
       .add(incidentData);
 
-    // ---------------- 5️⃣ REAL-TIME ALERT ----------------
+    // ---------------- 5️⃣ REAL-TIME ALERT (SOCKET.IO) ----------------
     const io = req.app.get("io");
     if (io) {
       io.emit("new-incident", {
@@ -103,6 +124,7 @@ exports.createIncident = async (req, res) => {
         ...incidentData,
       },
     });
+
   } catch (error) {
     console.error("❌ Incident Error:", error);
 

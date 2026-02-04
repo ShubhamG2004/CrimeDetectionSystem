@@ -416,42 +416,48 @@ class PoseCrimeDetector:
     def _classify(self, signals, activities, persons):
         s = set(signals)
         a = set(activities)
-        
+
+        # ---- NEW: helper flags (ONLY ADDITION) ----
+        has_punch = any(sig.startswith("PUNCH") for sig in s)
+        has_kick = any(sig.startswith("KICK") for sig in s)
+
         # High threat scenarios
         if "GRAB_NECK_LEFT" in s or "GRAB_NECK_RIGHT" in s:
             return "Choking / Attempted Murder", "CRITICAL"
-        
+
         if ("WEAPON_THREAT_LEFT" in s or "WEAPON_THREAT_RIGHT" in s) and \
            ("CLOSE_CONTACT" in s or "PHYSICAL_ASSAULT" in a):
             return "Assault with Weapon", "CRITICAL"
-        
+
         if "GRABBING" in s and "FOLLOWING_CHASING" in a:
             return "Kidnapping / Abduction", "CRITICAL"
-        
-        if "FALLEN" in s and persons >= 2 and ("PUNCH" in s or "KICK" in s):
+
+        if "FALLEN" in s and persons >= 2 and (has_punch or has_kick):
             return "Assault on Fallen Victim", "CRITICAL"
-        
+
         if persons >= 3 and ("PHYSICAL_ASSAULT" in a or "CROWD_FORMATION" in a):
             return "Crowd Violence / Riot", "HIGH"
-        
+
+        # ---- FIXED FIGHT LOGIC (THIS WAS THE BUG) ----
+        if persons == 2 and (has_punch or has_kick):
+            return "Fight / Physical Violence", "HIGH"
+
         # Medium threat scenarios
         if "ASSAULT_HEAD" in s:
             return "Physical Assault", "HIGH"
-        
-        if ("PUNCH" in s or "KICK" in s) and persons == 2:
-            return "Fight / Physical Violence", "HIGH"
-        
+
         if "CLOSE_CONTACT" in s and persons == 2 and "RUNNING" in a:
             return "Robbery / Mugging", "HIGH"
-        
+
         if "THREATENING_GESTURE" in a and "CLOSE_CONTACT" in s:
             return "Threatening Behavior", "MEDIUM"
-        
+
         # Low threat scenarios
         if len(s) > 0 or len(a) > 0:
             return "Suspicious Activity", "LOW"
-        
+
         return "Normal", "LOW"
+
     
     # -------------------------------------------------
     # UTILITY METHODS

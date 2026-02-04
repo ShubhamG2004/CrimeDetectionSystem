@@ -98,7 +98,6 @@ def calculate_response_time(start_time):
 # --------------------------------------------------
 # CORE ANALYSIS
 # --------------------------------------------------
-
 def analyze_image(image):
     """
     Runs pose-based crime detection with preprocessing
@@ -124,11 +123,27 @@ def analyze_image(image):
         confidence = normalize_confidence(
             result.get("confidence", 0.0)
         )
+
+        crime_type = result.get("crime_type", "NO_CRIME")
+
+        # 🔥 FIX: violent crimes are crimes even with moderate confidence
+        crime_detected = (
+            result.get("crime_detected", False)
+            or crime_type in [
+                "Fight / Physical Violence",
+                "Physical Assault",
+                "Assault on Fallen Victim",
+                "Choking / Attempted Murder",
+                "Assault with Weapon",
+                "Kidnapping / Abduction",
+                "Crowd Violence / Riot"
+            ]
+        )
         
         return {
-            "type": result.get("crime_type", "NO_CRIME"),
+            "type": crime_type,
             "confidence": confidence,
-            "crime_detected": int(result.get("crime_detected", 0)),
+            "crime_detected": int(crime_detected),
             "threat_level": result.get("threat_level", "LOW"),
             "persons_detected": int(result.get("persons_detected", 0)),
             "activities": result.get("activities", []),
