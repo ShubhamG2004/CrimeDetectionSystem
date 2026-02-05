@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import AdminSidebar from "@/components/AdminSidebar";
+import Navbar from "@/components/Navbar";
 
 export default function ManageCameras() {
   const router = useRouter();
@@ -12,27 +14,22 @@ export default function ManageCameras() {
   const [editing, setEditing] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  const [form, setForm] = useState({
+  const emptyForm = {
     name: "",
     area: "",
     latitude: "",
     longitude: "",
     active: true,
-  });
+  };
 
-  /* ---------------- AUTH + ROLE GUARD ---------------- */
+  const [form, setForm] = useState(emptyForm);
+
+  /* ---------------- AUTH ---------------- */
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) {
-        router.push("/login");
-        return;
-      }
-
-      const role = localStorage.getItem("role");
-      if (role !== "admin") {
-        router.push("/dashboard");
-        return;
-      }
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!user) return router.push("/login");
+      if (localStorage.getItem("role") !== "admin")
+        return router.push("/dashboard");
 
       setLoading(false);
       fetchCameras();
@@ -41,194 +38,207 @@ export default function ManageCameras() {
     return () => unsub();
   }, [router]);
 
-  /* ---------------- FETCH CAMERAS ---------------- */
+  /* ---------------- FETCH ---------------- */
   const fetchCameras = async () => {
-    try {
-      const token = await auth.currentUser.getIdToken();
+    const token = await auth.currentUser.getIdToken();
+    const res = await fetch("http://localhost:5000/api/cameras", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setCameras(await res.json());
+  };
 
-      const res = await fetch("http://localhost:5000/api/cameras", {
+  /* ---------------- ADD ---------------- */
+  const addCamera = async () => {
+    const token = await auth.currentUser.getIdToken();
+
+    const payload = {
+      ...form,
+      latitude: Number(form.latitude),
+      longitude: Number(form.longitude),
+      active: Boolean(form.active),
+    };
+
+    const res = await fetch("http://localhost:5000/api/cameras", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await res.json();
+    if (!res.ok) return alert(data.message);
+
+    alert("✅ Camera added");
+    setEditing(null);
+    setForm(emptyForm);
+    fetchCameras();
+  };
+
+  /* ---------------- UPDATE ---------------- */
+  const updateCamera = async () => {
+    const token = await auth.currentUser.getIdToken();
+
+    const payload = {
+      ...form,
+      latitude: Number(form.latitude),
+      longitude: Number(form.longitude),
+      active: Boolean(form.active),
+    };
+
+    const res = await fetch(
+      `http://localhost:5000/api/cameras/${editing}`,
+      {
+        method: "PUT",
         headers: {
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-      });
-
-      const data = await res.json();
-      setCameras(data);
-    } catch (err) {
-      console.error("Failed to fetch cameras", err);
-    }
-  };
-
-  /* ---------------- OPEN EDIT MODAL ---------------- */
-  const openEdit = (camera) => {
-    setEditing(camera.cameraId);
-    setForm({
-      name: camera.name || "",
-      area: camera.area || "",
-      latitude: camera.latitude ?? "",
-      longitude: camera.longitude ?? "",
-      active: camera.active ?? true,
-    });
-  };
-
-  /* ---------------- UPDATE CAMERA ---------------- */
-  const updateCamera = async () => {
-    try {
-      const token = await auth.currentUser.getIdToken();
-
-      await fetch(
-        `http://localhost:5000/api/cameras/${editing}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            ...form,
-            latitude: Number(form.latitude),
-            longitude: Number(form.longitude),
-          }),
-        }
-      );
-
-      setEditing(null);
-      fetchCameras();
-    } catch (err) {
-      alert("Failed to update camera");
-    }
-  };
-
-  /* ---------------- DELETE CAMERA ---------------- */
-  const deleteCamera = async (cameraId) => {
-    if (!confirm("Delete this camera?")) return;
-
-    try {
-      const token = await auth.currentUser.getIdToken();
-
-      await fetch(
-        `http://localhost:5000/api/cameras/${cameraId}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-
-      fetchCameras();
-    } catch (err) {
-      alert("Failed to delete camera");
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Loading cameras...</p>
-      </div>
+        body: JSON.stringify(payload),
+      }
     );
-  }
+
+    const data = await res.json();
+    if (!res.ok) return alert(data.message);
+
+    alert("✅ Camera updated");
+    setEditing(null);
+    fetchCameras();
+  };
+
+  /* ---------------- DELETE ---------------- */
+  const deleteCamera = async (id) => {
+    if (!confirm("Delete camera?")) return;
+    const token = await auth.currentUser.getIdToken();
+
+    await fetch(`http://localhost:5000/api/cameras/${id}`, {
+      method: "DELETE",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+
+    fetchCameras();
+  };
+
+  if (loading) return <p className="ml-64 p-6">Loading...</p>;
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">
-        🎥 Manage Cameras (Admin)
-      </h1>
+    <>
+      {/* 🔥 ADMIN SIDEBAR */}
+      <AdminSidebar />
 
-      <table className="w-full border">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="border p-2">Camera ID</th>
-            <th className="border p-2">Name</th>
-            <th className="border p-2">Area</th>
-            <th className="border p-2">Active</th>
-            <th className="border p-2">Actions</th>
-          </tr>
-        </thead>
+      {/* 🔥 MAIN CONTENT */}
+      <main className="ml-64 p-6">
+        <div className="flex justify-between mb-4">
+          <h1 className="text-2xl font-bold">🎥 Manage Cameras</h1>
+          <button
+            className="bg-green-600 text-white px-4 py-2 rounded"
+            onClick={() => {
+              setEditing("new");
+              setForm(emptyForm);
+            }}
+          >
+            ➕ Add Camera
+          </button>
+        </div>
 
-        <tbody>
-          {cameras.map((cam) => (
-            <tr key={cam.cameraId}>
-              <td className="border p-2">{cam.cameraId}</td>
-              <td className="border p-2">{cam.name}</td>
-              <td className="border p-2">{cam.area}</td>
-              <td className="border p-2">
-                {cam.active ? "Yes" : "No"}
-              </td>
-              <td className="border p-2 space-x-2">
-                <button
-                  onClick={() => openEdit(cam)}
-                  className="bg-blue-600 text-white px-2 py-1 rounded"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => deleteCamera(cam.cameraId)}
-                  className="bg-red-600 text-white px-2 py-1 rounded"
-                >
-                  Delete
-                </button>
-              </td>
+        <table className="w-full border">
+          <thead className="bg-gray-100">
+            <tr>
+              <th>ID</th>
+              <th>Name</th>
+              <th>Area</th>
+              <th>Lat</th>
+              <th>Lng</th>
+              <th>Status</th>
+              <th>Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {/* ✏️ EDIT MODAL */}
-      {editing && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white p-6 rounded w-96">
-            <h2 className="text-xl font-bold mb-4">
-              Edit Camera
-            </h2>
-
-            {["name", "area", "latitude", "longitude"].map((field) => (
-              <input
-                key={field}
-                className="w-full p-2 border mb-2"
-                placeholder={field}
-                value={form[field]}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    [field]: e.target.value,
-                  })
-                }
-              />
+          </thead>
+          <tbody>
+            {cameras.map((cam) => (
+              <tr key={cam.cameraId}>
+                <td>{cam.cameraId}</td>
+                <td>{cam.name}</td>
+                <td>{cam.area}</td>
+                <td>{cam.latitude}</td>
+                <td>{cam.longitude}</td>
+                <td className={cam.active ? "text-green-600" : "text-red-600"}>
+                  {cam.active ? "ACTIVE" : "INACTIVE"}
+                </td>
+                <td>
+                  <button
+                    onClick={() => {
+                      setEditing(cam.cameraId);
+                      setForm({
+                        name: cam.name,
+                        area: cam.area,
+                        latitude: cam.latitude,
+                        longitude: cam.longitude,
+                        active: Boolean(cam.active),
+                      });
+                    }}
+                    className="bg-blue-600 text-white px-2 mr-2"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => deleteCamera(cam.cameraId)}
+                    className="bg-red-600 text-white px-2"
+                  >
+                    Delete
+                  </button>
+                </td>
+              </tr>
             ))}
+          </tbody>
+        </table>
 
-            <label className="flex items-center gap-2 mb-3">
-              <input
-                type="checkbox"
-                checked={form.active}
-                onChange={(e) =>
-                  setForm({
-                    ...form,
-                    active: e.target.checked,
-                  })
-                }
-              />
-              Active
-            </label>
+        {/* MODAL */}
+        {editing && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+            <div className="bg-white p-6 w-96 rounded">
+              <h2 className="text-xl font-bold mb-3">
+                {editing === "new" ? "Add Camera" : "Edit Camera"}
+              </h2>
 
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => setEditing(null)}
-                className="px-3 py-1 border rounded"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={updateCamera}
-                className="px-3 py-1 bg-green-600 text-white rounded"
-              >
-                Save
-              </button>
+              {["name", "area", "latitude", "longitude"].map((f) => (
+                <input
+                  key={f}
+                  className="border p-2 w-full mb-2"
+                  placeholder={f}
+                  value={form[f]}
+                  onChange={(e) =>
+                    setForm({ ...form, [f]: e.target.value })
+                  }
+                />
+              ))}
+
+              {/* 🔥 ACTIVE SLIDER */}
+              <div className="flex items-center gap-3 mb-4">
+                <span>Inactive</span>
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.active)}
+                  onChange={(e) =>
+                    setForm({ ...form, active: e.target.checked })
+                  }
+                />
+                <span>Active</span>
+              </div>
+
+              <div className="flex justify-end gap-2">
+                <button onClick={() => setEditing(null)}>Cancel</button>
+                <button
+                  onClick={editing === "new" ? addCamera : updateCamera}
+                  className="bg-green-600 text-white px-3 py-1"
+                >
+                  Save
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </main>
+    </>
   );
 }

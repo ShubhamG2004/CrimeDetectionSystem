@@ -37,64 +37,50 @@ export default function ImageDetectionPage() {
 
   /* ---------- SUBMIT IMAGE ---------- */
   const submitImage = async () => {
-    if (!image) {
-      alert("Please upload an image");
-      return;
-    }
+  if (!image || !location.trim()) {
+    alert("Image & location required");
+    return;
+  }
 
-    if (!location.trim()) {
-      alert("Please enter location name");
-      return;
-    }
+  setLoading(true);
+  setError("");
+  setResult(null);
 
-    setLoading(true);
-    setResult(null);
-    setError("");
+  const formData = new FormData();
+  formData.append("image", image);
+  formData.append("location", location);
 
-    const formData = new FormData();
-    formData.append("image", image);
-    formData.append("location", location);
-
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/detect-image`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || `Server error: ${response.status}`);
+  try {
+    const response = await fetch(
+      "http://localhost:5000/api/detect/image", // ✅ BACKEND
+      {
+        method: "POST",
+        body: formData,
       }
+    );
 
-      if (!data.success) {
-        setError(data.error || "Detection failed");
-        return;
-      }
+    const data = await response.json();
 
-      // Debug log
-      console.log("Response from server:", data);
-      
-      // Ensure persons_detected is a number
-      const personsDetected = parseInt(data.persons_detected) || 0;
-      
-      setResult({
-        ...data,
-        persons_detected: personsDetected,
-        confidence: parseFloat(data.confidence) || 0,
-        threat_score: parseInt(data.threat_score) || 0
-      });
-
-    } catch (error) {
-      console.error("Detection error:", error);
-      setError(error.message || "Failed to connect to detection server");
-    } finally {
-      setLoading(false);
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || "Detection failed");
     }
-  };
+
+    console.log("✅ SAVED TO DB:", data);
+
+    setResult({
+      ...data.data,
+      confidence: Number(data.data.confidence) || 0,
+      persons_detected: Number(data.data.persons_detected) || 0,
+      threat_score: Number(data.data.threat_score) || 0,
+    });
+  } catch (err) {
+    console.error(err);
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   /* ---------- RESET ---------- */
   const resetForm = () => {
@@ -357,7 +343,18 @@ export default function ImageDetectionPage() {
 
                   <div>
                     <h4 className="font-medium text-gray-700 mb-2">Location</h4>
-                    <p className="text-gray-800">{result.location || location}</p>
+                    <p className="text-gray-800">
+                      {typeof result.location === "object"
+                        ? (result.location?.name || "Unknown")
+                        : (result.location || location || "Unknown")}
+                    </p>
+                    {typeof result.location === "object" &&
+                      result.location?.lat != null &&
+                      result.location?.lng != null && (
+                        <p className="text-sm text-gray-600">
+                          📍 Lat: {result.location.lat}, Lng: {result.location.lng}
+                        </p>
+                      )}
                   </div>
 
                   <div className="text-sm text-gray-500">
