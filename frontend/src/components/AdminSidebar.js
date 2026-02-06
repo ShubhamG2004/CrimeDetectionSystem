@@ -29,7 +29,7 @@ export default function AdminSidebar() {
       </a>
 
       <a
-        href="/cameras/manage"
+        href="/cameras"
         className="block px-3 py-2 rounded hover:bg-gray-700"
       >
         🎥 Manage Cameras

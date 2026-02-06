@@ -11,6 +11,7 @@ export default function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [loginType, setLoginType] = useState("admin"); // admin | operator
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -29,22 +30,36 @@ export default function Login() {
 
       const uid = userCred.user.uid;
 
-      // 🧭 2️⃣ Fetch user role from Firestore
-      const userDoc = await getDoc(doc(db, "users", uid));
+      // 🧭 2️⃣ Decide collection based on login type
+      const collectionName =
+        loginType === "operator" ? "operators" : "users";
 
-      if (!userDoc.exists()) {
-        setError("No role assigned to this user");
+      const userRef = doc(db, collectionName, uid);
+      const userSnap = await getDoc(userRef);
+
+      if (!userSnap.exists()) {
+        setError(
+          loginType === "operator"
+            ? "No operator account found"
+            : "No admin account found"
+        );
+        await auth.signOut();
         setLoading(false);
         return;
       }
 
-      const { role } = userDoc.data();
+      const data = userSnap.data();
 
-      // 💾 3️⃣ Store role locally
-      localStorage.setItem("role", role);
+      // 💾 3️⃣ Store role + uid
+      localStorage.setItem("role", data.role || loginType);
+      localStorage.setItem("uid", uid);
 
-      // 🚀 4️⃣ Redirect (same dashboard for admin/operator)
-      router.push("/dashboard");
+      // 🚀 4️⃣ Redirect
+      if (loginType === "admin") {
+        router.push("/dashboard/admin");
+      } else {
+        router.push("/dashboard/operator");
+      }
 
     } catch (err) {
       console.error(err);
@@ -69,6 +84,19 @@ export default function Login() {
             {error}
           </p>
         )}
+
+        {/* LOGIN TYPE */}
+        <label className="text-sm font-semibold text-gray-700 mb-1 block">
+          Login As
+        </label>
+        <select
+          value={loginType}
+          onChange={(e) => setLoginType(e.target.value)}
+          className="w-full p-2 border rounded mb-3 text-gray-800"
+        >
+          <option value="admin">Admin</option>
+          <option value="operator">Operator</option>
+        </select>
 
         <input
           type="email"

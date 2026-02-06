@@ -8,29 +8,38 @@ const { db } = require("../config/firebase");
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
+/* --------------------------------------------------
+   🧠 Helper: Safe JSON Parse (for FormData fields)
+-------------------------------------------------- */
+const parseJSON = (value) => {
+  try {
+    return typeof value === "string" ? JSON.parse(value) : value;
+  } catch {
+    return null;
+  }
+};
+
 router.post("/image", upload.single("image"), async (req, res) => {
   console.log("\n📥 IMAGE DETECTION REQUEST RECEIVED");
 
   try {
-    // ---------------- VALIDATION ----------------
+    /* ---------------- VALIDATION ---------------- */
     if (!req.file) {
-      console.log("❌ No image uploaded");
       return res.status(400).json({
         success: false,
         message: "No image uploaded",
-        type: "NO_IMAGE",
-        confidence: 0,
-        location: req.body.location || "Unknown",
       });
     }
 
-    const location = req.body.location || "Unknown";
-    console.log(`📍 Location: ${location}`);
+    /* ---------------- PARSE LOCATION ---------------- */
+    const location = parseJSON(req.body.location);
+
+    console.log("📍 Parsed Location:", location);
     console.log(
       `🖼️ Image: ${req.file.originalname} (${req.file.mimetype})`
     );
 
-    // ---------------- 1️⃣ SEND IMAGE TO AI SERVER ----------------
+    /* ---------------- 1️⃣ SEND IMAGE TO AI SERVER ---------------- */
     console.log("🤖 Sending image to AI server...");
 
     const formData = new FormData();
@@ -38,7 +47,11 @@ router.post("/image", upload.single("image"), async (req, res) => {
       filename: req.file.originalname,
       contentType: req.file.mimetype,
     });
-    formData.append("location", location);
+
+    // Send raw location string to AI (optional)
+    if (req.body.location) {
+      formData.append("location", req.body.location);
+    }
 
     const aiRes = await axios.post(
       "http://127.0.0.1:8000/detect-image",
@@ -64,42 +77,38 @@ router.post("/image", upload.single("image"), async (req, res) => {
     console.log(`   Confidence     : ${(confidence * 100).toFixed(0)}%`);
     console.log(`   Threat Level   : ${threat_level}`);
     console.log(`   People Detected: ${persons_detected}`);
-    console.log(`   Signals        : ${signals.join(", ") || "None"}`);
 
-    // ---------------- 2️⃣ UPLOAD IMAGE TO CLOUDINARY ----------------
+    /* ---------------- 2️⃣ UPLOAD IMAGE TO CLOUDINARY ---------------- */
     console.log("☁️ Uploading image to Cloudinary...");
 
     const imageBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString(
       "base64"
     )}`;
 
-    const uploadRes = await cloudinary.uploader.upload(
-      imageBase64,
-      {
-        folder: "crime-detection/incidents",
-      }
-    );
+    const uploadRes = await cloudinary.uploader.upload(imageBase64, {
+      folder: "crime-detection/incidents",
+    });
 
-    console.log("✅ Image uploaded to Cloudinary");
-    console.log(`   URL: ${uploadRes.secure_url}`);
+    console.log("✅ Image uploaded:", uploadRes.secure_url);
 
-    // ---------------- 3️⃣ SAVE TO FIRESTORE ----------------
+    /* ---------------- 3️⃣ SAVE TO FIRESTORE ---------------- */
     console.log("💾 Saving incident to Firestore...");
 
     const incidentData = {
       crime_type: type,
-      confidence:
-        typeof confidence === "number" ? confidence : 0,
+      confidence: typeof confidence === "number" ? confidence : 0,
       threat_level,
 
       persons_detected,
       activities,
       signals,
 
+      // ✅ FIXED LOCATION STORAGE
       location: {
-        name: location,
-        lat: null,
-        lng: null,
+        cameraId: location?.cameraId || null,
+        name: location?.name || "Unknown",
+        lat: location?.lat ?? null,
+        lng: location?.lng ?? null,
       },
 
       imageUrl: uploadRes.secure_url,
@@ -109,15 +118,13 @@ router.post("/image", upload.single("image"), async (req, res) => {
       aiTimestamp: timestamp || null,
     };
 
-    const docRef = await db
-      .collection("incidents")
-      .add(incidentData);
+    const docRef = await db.collection("incidents").add(incidentData);
 
     console.log("✅ INCIDENT SAVED SUCCESSFULLY");
     console.log(`🆔 Incident ID: ${docRef.id}`);
     console.log("--------------------------------------------------");
 
-    // ---------------- RESPONSE ----------------
+    /* ---------------- RESPONSE ---------------- */
     return res.status(201).json({
       success: true,
       message: "Crime detected and saved successfully",
@@ -125,15 +132,11 @@ router.post("/image", upload.single("image"), async (req, res) => {
       data: incidentData,
     });
   } catch (err) {
-    console.error("❌ AI DETECT ERROR:", err.message);
-    console.log("--------------------------------------------------");
+    console.error("❌ AI DETECT ERROR:", err);
 
     return res.status(500).json({
       success: false,
       message: "Crime detection failed",
-      type: "ERROR",
-      confidence: 0,
-      location: req.body?.location || "Unknown",
     });
   }
 });

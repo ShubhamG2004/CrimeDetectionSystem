@@ -14,6 +14,8 @@ app.use(cors());
 app.use(express.json({ limit: "50mb" }));
 
 app.use("/api/incidents", incidentRoutes);
+app.use("/api/operator", require("./routes/operator"));
+
 
 app.get("/", (req, res) => {
   res.send("Crime Detection Backend Running 🚓");

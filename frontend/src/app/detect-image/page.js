@@ -1,17 +1,59 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
+import { auth } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 export default function ImageDetectionPage() {
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
-  const [location, setLocation] = useState("");
+  
+  const [cameras, setCameras] = useState([]);
+  const [selectedCameraId, setSelectedCameraId] = useState("");
+  const [selectedCamera, setSelectedCamera] = useState(null);
+  
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
-  /* ---------- HANDLE IMAGE ---------- */
+  /* ======================================================
+     🎥 FETCH CAMERAS AFTER AUTH IS READY
+     ====================================================== */
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (!user) return;
+
+      try {
+        const token = await user.getIdToken();
+
+        const res = await fetch(
+          "http://localhost:5000/api/operator/cameras",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await res.json();
+
+        if (Array.isArray(data)) {
+          setCameras(data);
+        } else {
+          console.warn("Unexpected cameras response:", data);
+          setCameras([]);
+        }
+      } catch (err) {
+        console.error("Failed to fetch cameras:", err);
+        setCameras([]);
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  /* ================= IMAGE HANDLER ================= */
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -35,63 +77,133 @@ export default function ImageDetectionPage() {
     setResult(null);
   };
 
-  /* ---------- SUBMIT IMAGE ---------- */
-  const submitImage = async () => {
-  if (!image || !location.trim()) {
-    alert("Image & location required");
-    return;
-  }
+  /* ================= CAMERA SELECT ================= */
+  const handleCameraChange = (cameraId) => {
+    setSelectedCameraId(cameraId);
+    const cam = cameras.find((c) => c.cameraId === cameraId);
+    setSelectedCamera(cam || null);
+  };
 
-  setLoading(true);
-  setError("");
-  setResult(null);
+  /* ================= CALCULATE THREAT SCORE ================= */
+  const calculateThreatScore = (data) => {
+    // If threat_score is provided, use it
+    if (data.threat_score !== undefined) {
+      return data.threat_score;
+    }
+    
+    // Otherwise calculate based on confidence and threat level
+    let baseScore = 0;
+    
+    // Base on confidence
+    const confidence = data.confidence || 0;
+    baseScore = Math.round(confidence * 100);
+    
+    // Adjust based on threat level
+    const threatLevel = data.threat_level?.toUpperCase() || "LOW";
+    switch (threatLevel) {
+      case "CRITICAL":
+        return Math.min(100, baseScore + 40);
+      case "HIGH":
+        return Math.min(100, baseScore + 25);
+      case "MEDIUM":
+        return Math.min(100, baseScore + 15);
+      case "LOW":
+        return baseScore;
+      default:
+        return baseScore;
+    }
+  };
 
-  const formData = new FormData();
-  formData.append("image", image);
-  formData.append("location", location);
-
-  try {
-    const response = await fetch(
-      "http://localhost:5000/api/detect/image", // ✅ BACKEND
-      {
-        method: "POST",
-        body: formData,
-      }
+  /* ================= DETERMINE CRIME STATUS ================= */
+  const determineCrimeStatus = (data) => {
+    // If crime_detected is explicitly set, use it
+    if (data.crime_detected !== undefined) {
+      return data.crime_detected;
+    }
+    
+    // Otherwise infer from threat level and crime type
+    const threatLevel = data.threat_level?.toUpperCase() || "LOW";
+    const crimeType = data.crime_type || data.type || "";
+    const confidence = data.confidence || 0;
+    
+    // If it's a serious crime type or high threat level, mark as crime detected
+    const seriousCrimes = ["KIDNAPPING", "ABDUCTION", "ASSAULT", "ROBBERY", "FIGHT"];
+    const isSeriousCrime = seriousCrimes.some(crime => 
+      crimeType.toUpperCase().includes(crime)
     );
+    
+    return isSeriousCrime || threatLevel === "HIGH" || threatLevel === "CRITICAL" || confidence > 0.7;
+  };
 
-    const data = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.message || "Detection failed");
+  /* ================= SUBMIT ================= */
+  const submitImage = async () => {
+    if (!image || !selectedCamera) {
+      alert("Please select a camera and upload an image");
+      return;
     }
 
-    console.log("✅ SAVED TO DB:", data);
+    setLoading(true);
+    setError("");
+    setResult(null);
 
-    setResult({
-      ...data.data,
-      confidence: Number(data.data.confidence) || 0,
-      persons_detected: Number(data.data.persons_detected) || 0,
-      threat_score: Number(data.data.threat_score) || 0,
-    });
-  } catch (err) {
-    console.error(err);
-    setError(err.message);
-  } finally {
-    setLoading(false);
-  }
-};
+    const formData = new FormData();
+    formData.append("image", image);
+    formData.append(
+      "location",
+      JSON.stringify({
+        name: selectedCamera.area,
+        lat: selectedCamera.latitude,
+        lng: selectedCamera.longitude,
+        cameraId: selectedCamera.cameraId,
+      })
+    );
 
+    try {
+      const res = await fetch(
+        "http://localhost:5000/api/detect/image",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
-  /* ---------- RESET ---------- */
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || "Detection failed");
+      }
+
+      console.log("✅ SAVED TO DB:", data);
+
+      // Process the response data
+      const processedData = {
+        ...data.data,
+        confidence: Number(data.data.confidence) || 0,
+        persons_detected: Number(data.data.persons_detected) || 0,
+        threat_score: calculateThreatScore(data.data),
+        crime_detected: determineCrimeStatus(data.data),
+      };
+
+      setResult(processedData);
+    } catch (err) {
+      console.error(err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  /* ================= RESET ================= */
   const resetForm = () => {
     setImage(null);
     setPreview(null);
-    setLocation("");
+    setSelectedCamera(null);
+    setSelectedCameraId("");
     setResult(null);
     setError("");
   };
 
-  /* ---------- THREAT LEVEL COLORS ---------- */
+  /* ================= THREAT LEVEL COLORS ================= */
   const getThreatColor = (level) => {
     switch (level?.toUpperCase()) {
       case "CRITICAL":
@@ -122,6 +234,23 @@ export default function ImageDetectionPage() {
     }
   };
 
+  /* ================= GET CRIME TYPE DISPLAY ================= */
+  const getCrimeTypeDisplay = (data) => {
+    if (data.crime_type) return data.crime_type;
+    if (data.type) return data.type;
+    
+    // If crime is detected but no type specified, show generic message
+    if (data.crime_detected) {
+      const threatLevel = data.threat_level?.toUpperCase();
+      if (threatLevel === "CRITICAL" || threatLevel === "HIGH") {
+        return "Violent Activity";
+      }
+      return "Suspicious Activity";
+    }
+    
+    return "Normal Activity";
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
       <Navbar title="🖼️ AI Crime Image Detection" />
@@ -143,6 +272,40 @@ export default function ImageDetectionPage() {
             <h2 className="text-xl font-semibold text-gray-800 mb-4">
               Upload & Detect
             </h2>
+
+            {/* CAMERA SELECTION */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Camera *
+              </label>
+              <select
+                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={selectedCameraId}
+                onChange={(e) => handleCameraChange(e.target.value)}
+              >
+                <option value="">-- Select Camera --</option>
+                {cameras.map((cam) => (
+                  <option key={cam.cameraId} value={cam.cameraId}>
+                    {cam.name} ({cam.area})
+                  </option>
+                ))}
+              </select>
+              {cameras.length === 0 && (
+                <p className="text-sm text-gray-500 mt-2">
+                  No cameras assigned to you
+                </p>
+              )}
+              {selectedCamera && (
+                <div className="mt-2 p-3 bg-blue-50 rounded-lg">
+                  <p className="text-sm font-medium text-blue-800">
+                    📍 {selectedCamera.area}
+                  </p>
+                  <p className="text-xs text-blue-600">
+                    Lat: {selectedCamera.latitude}, Lng: {selectedCamera.longitude}
+                  </p>
+                </div>
+              )}
+            </div>
 
             {/* IMAGE UPLOAD */}
             <div className="mb-6">
@@ -197,20 +360,6 @@ export default function ImageDetectionPage() {
               </div>
             </div>
 
-            {/* LOCATION INPUT */}
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Location Name *
-              </label>
-              <input
-                type="text"
-                placeholder="e.g., Parking Area, Gate 2, Pune"
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-              />
-            </div>
-
             {/* ERROR MESSAGE */}
             {error && (
               <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600">
@@ -222,7 +371,7 @@ export default function ImageDetectionPage() {
             <div className="flex gap-3">
               <button
                 onClick={submitImage}
-                disabled={loading || !image || !location}
+                disabled={loading || !image || !selectedCamera}
                 className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
               >
                 {loading ? (
@@ -252,6 +401,7 @@ export default function ImageDetectionPage() {
                 <li>• Well-lit images work better for detection</li>
                 <li>• Multiple people interactions will be analyzed</li>
                 <li>• System detects punches, kicks, grabs, falls, and more</li>
+                <li>• Camera location will be automatically recorded</li>
               </ul>
             </div>
           </div>
@@ -275,7 +425,7 @@ export default function ImageDetectionPage() {
                     </span>
                   </div>
                   <p className="text-gray-700">
-                    {result.type || "Normal Activity"}
+                    {getCrimeTypeDisplay(result)}
                   </p>
                 </div>
 
@@ -318,7 +468,7 @@ export default function ImageDetectionPage() {
                             key={idx}
                             className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
                           >
-                            {activity}
+                            {activity.replace(/_/g, ' ')}
                           </span>
                         ))}
                       </div>
@@ -334,7 +484,7 @@ export default function ImageDetectionPage() {
                             key={idx}
                             className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm"
                           >
-                            {signal}
+                            {signal.replace(/_/g, ' ')}
                           </span>
                         ))}
                       </div>
@@ -345,20 +495,27 @@ export default function ImageDetectionPage() {
                     <h4 className="font-medium text-gray-700 mb-2">Location</h4>
                     <p className="text-gray-800">
                       {typeof result.location === "object"
-                        ? (result.location?.name || "Unknown")
-                        : (result.location || location || "Unknown")}
+                        ? (result.location?.name || selectedCamera?.area || "Unknown")
+                        : (result.location || selectedCamera?.area || "Unknown")}
                     </p>
                     {typeof result.location === "object" &&
                       result.location?.lat != null &&
-                      result.location?.lng != null && (
+                      result.location?.lng != null ? (
                         <p className="text-sm text-gray-600">
                           📍 Lat: {result.location.lat}, Lng: {result.location.lng}
+                        </p>
+                      ) : selectedCamera && (
+                        <p className="text-sm text-gray-600">
+                          📍 Lat: {selectedCamera.latitude}, Lng: {selectedCamera.longitude}
                         </p>
                       )}
                   </div>
 
                   <div className="text-sm text-gray-500">
                     <p>Timestamp: {result.timestamp ? new Date(result.timestamp).toLocaleString() : new Date().toLocaleString()}</p>
+                    {selectedCamera && (
+                      <p>Camera: {selectedCamera.name}</p>
+                    )}
                   </div>
                 </div>
               </>
@@ -370,7 +527,7 @@ export default function ImageDetectionPage() {
                   No Detection Yet
                 </h3>
                 <p className="text-gray-500">
-                  Upload an image and click "Detect Crime" to see results
+                  Select a camera, upload an image and click "Detect Crime" to see results
                 </p>
               </div>
             )}
