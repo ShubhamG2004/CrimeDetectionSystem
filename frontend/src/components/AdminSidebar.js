@@ -34,13 +34,13 @@ export default function AdminSidebar() {
       >
         🎥 Manage Cameras
       </a>
-      <a
-    href="/dashboard/admin/operators"
-    className="block px-3 py-2 rounded hover:bg-gray-700"
-    >
-    👮 Manage Operators
-    </a>
 
+      <a
+        href="/dashboard/admin/operators"
+        className="block px-3 py-2 rounded hover:bg-gray-700"
+      >
+        👮 Manage Operators
+      </a>
     </div>
   );
 }

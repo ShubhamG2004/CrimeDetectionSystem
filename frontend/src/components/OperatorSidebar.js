@@ -25,12 +25,22 @@ export default function OperatorSidebar() {
         </a>
 
         <a
+          href="/dashboard/operator/map"
+          className="block px-3 py-2 rounded hover:bg-gray-700"
+        >
+          🗺️ Incident Map
+        </a>
+
+
+        <a
           href="#"
           className="block px-3 py-2 rounded hover:bg-gray-700 opacity-60 cursor-not-allowed"
         >
           🗺 Map View (Coming Soon)
         </a>
       </nav>
+
+      
 
       <div className="mt-6">
         <LogoutButton />

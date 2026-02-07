@@ -3,18 +3,9 @@ const router = express.Router();
 const { admin } = require("../config/firebase");
 const { verifyToken, requireAdmin } = require("../middleware/auth");
 
-/**
- * ======================================================
- * ➕ CREATE OPERATOR (ADMIN ONLY)
- * ======================================================
- * Creates:
- * 1️⃣ Firebase Auth user (email + password)
- * 2️⃣ Firestore operator profile
- *
- * Firestore:
- * operators/{uid}
- * ======================================================
- */
+/* ======================================================
+   ➕ CREATE OPERATOR (ADMIN ONLY)
+   ====================================================== */
 router.post(
   "/create-operator",
   verifyToken,
@@ -22,23 +13,32 @@ router.post(
   async (req, res) => {
     const { email, password, cameras } = req.body;
 
-    if (!email || !password || !Array.isArray(cameras) || cameras.length === 0) {
+    // 🔒 Validation
+    if (
+      !email ||
+      !password ||
+      password.length < 6 ||
+      !Array.isArray(cameras) ||
+      cameras.length === 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Email, password and at least one camera are required",
+        message:
+          "Email, password (min 6 chars), and at least one camera are required",
       });
     }
 
     let userRecord;
 
+    // Retry helpers (network-safe)
     const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
     const isNetworkTimeout = (error) =>
       error?.errorInfo?.code === "app/network-timeout" ||
       /timeout/i.test(error?.message || "");
+
     const createUserWithRetry = async (payload, attempts = 3) => {
       let lastError;
-
-      for (let attempt = 1; attempt <= attempts; attempt += 1) {
+      for (let attempt = 1; attempt <= attempts; attempt++) {
         try {
           return await admin.auth().createUser(payload);
         } catch (error) {
@@ -49,12 +49,11 @@ router.post(
           await sleep(500 * attempt);
         }
       }
-
       throw lastError;
     };
 
     try {
-      // ✅ CREATE AUTH USER (RETRY ON NETWORK TIMEOUT)
+      // 1️⃣ Create Firebase Auth user
       userRecord = await createUserWithRetry({
         email,
         password,
@@ -64,7 +63,7 @@ router.post(
 
       const uid = userRecord.uid;
 
-      // ✅ CREATE OPERATOR PROFILE
+      // 2️⃣ Create Firestore operator profile
       await admin.firestore().collection("operators").doc(uid).set({
         email,
         role: "operator",
@@ -79,16 +78,15 @@ router.post(
         uid,
         message: "Operator created successfully",
       });
-
     } catch (err) {
-      console.error("❌ Create Operator Error:", err);
+      console.error("❌ CREATE OPERATOR ERROR:", err);
 
-      // Rollback auth user if Firestore fails
+      // Rollback Auth user if Firestore fails
       if (userRecord?.uid) {
         try {
           await admin.auth().deleteUser(userRecord.uid);
-        } catch (e) {
-          console.error("Rollback failed:", e.message);
+        } catch (rollbackErr) {
+          console.error("⚠️ Rollback failed:", rollbackErr.message);
         }
       }
 
@@ -100,5 +98,40 @@ router.post(
   }
 );
 
+/* ======================================================
+   🔐 RESET OPERATOR PASSWORD (ADMIN ONLY)
+   ====================================================== */
+router.post(
+  "/reset-operator-password",
+  verifyToken,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { uid, newPassword } = req.body;
+
+      if (!uid || !newPassword || newPassword.length < 6) {
+        return res.status(400).json({
+          success: false,
+          message: "UID and password (min 6 chars) are required",
+        });
+      }
+
+      await admin.auth().updateUser(uid, {
+        password: newPassword,
+      });
+
+      return res.status(200).json({
+        success: true,
+        message: "Operator password reset successfully",
+      });
+    } catch (err) {
+      console.error("❌ RESET PASSWORD ERROR:", err);
+      return res.status(500).json({
+        success: false,
+        message: err.message || "Failed to reset password",
+      });
+    }
+  }
+);
 
 module.exports = router;

@@ -41,12 +41,18 @@ export default function ManageCameras() {
 
   /* ================= FETCH CAMERAS ================= */
   const fetchCameras = async () => {
-    const token = await auth.currentUser.getIdToken();
-    const res = await fetch("http://localhost:5000/api/cameras", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setCameras(await res.json());
-  };
+  const token = await auth.currentUser.getIdToken();
+
+  const res = await fetch("http://localhost:5000/api/cameras", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  const data = await res.json();
+
+  // ✅ FIX: extract array safely
+  setCameras(Array.isArray(data) ? data : data.cameras || []);
+};
+
 
   /* ================= ADD / UPDATE ================= */
   const saveCamera = async () => {
