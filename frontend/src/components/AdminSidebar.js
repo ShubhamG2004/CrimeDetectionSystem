@@ -41,6 +41,13 @@ export default function AdminSidebar() {
       >
         👮 Manage Operators
       </a>
+
+      <a
+        href="/dashboard/admin/operator-logs"
+        className="block px-3 py-2 rounded hover:bg-gray-700"
+      >
+        📜 Operator Logs
+      </a>
     </div>
   );
 }

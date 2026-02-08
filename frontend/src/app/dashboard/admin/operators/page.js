@@ -43,14 +43,25 @@ export default function ManageOperators() {
     if (checkedRef.current) return;
     checkedRef.current = true;
 
-    onAuthStateChanged(auth, (user) => {
-      if (!user) return router.replace("/login");
-      if (localStorage.getItem("role") !== "admin")
-        return router.replace("/dashboard/operator");
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+
+      const tokenResult = await user.getIdTokenResult(true);
+      const role = tokenResult.claims.role;
+
+      if (role !== "admin") {
+        router.replace("/dashboard/operator");
+        return;
+      }
 
       fetchOperators();
       fetchCameras();
     });
+
+    return () => unsub();
   }, [router]);
 
   /* ================= CLOSE DROPDOWN ON CLICK OUTSIDE ================= */

@@ -11,7 +11,7 @@ export default function Login() {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loginType, setLoginType] = useState("admin"); // admin | operator
+  const [loginType, setLoginType] = useState("admin"); // UI validation only
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -21,48 +21,79 @@ export default function Login() {
     setLoading(true);
 
     try {
-      // 🔐 1️⃣ Firebase Authentication
+      /* ===============================
+         1️⃣ FIREBASE AUTH LOGIN
+         =============================== */
       const userCred = await signInWithEmailAndPassword(
         auth,
         email,
         password
       );
 
-      const uid = userCred.user.uid;
+      const user = userCred.user;
+      const uid = user.uid;
 
-      // 🧭 2️⃣ Decide collection based on login type
-      const collectionName =
-        loginType === "operator" ? "operators" : "users";
+      /* ===============================
+         2️⃣ FORCE TOKEN REFRESH (CRITICAL)
+         =============================== */
+      const tokenResult = await user.getIdTokenResult(true);
+      const role = tokenResult.claims?.role;
 
-      const userRef = doc(db, collectionName, uid);
-      const userSnap = await getDoc(userRef);
-
-      if (!userSnap.exists()) {
-        setError(
-          loginType === "operator"
-            ? "No operator account found"
-            : "No admin account found"
-        );
+      if (!role) {
+        setError("User role not assigned. Contact admin.");
         await auth.signOut();
-        setLoading(false);
         return;
       }
 
-      const data = userSnap.data();
-
-      // 💾 3️⃣ Store role + uid
-      localStorage.setItem("role", data.role || loginType);
-      localStorage.setItem("uid", uid);
-
-      // 🚀 4️⃣ Redirect
-      if (loginType === "admin") {
-        router.push("/dashboard/admin");
-      } else {
-        router.push("/dashboard/operator");
+      /* ===============================
+         3️⃣ UI ROLE VALIDATION (SAFE)
+         =============================== */
+      if (loginType !== role) {
+        setError(
+          role === "admin"
+            ? "Please login as Admin"
+            : "Please login as Operator"
+        );
+        await auth.signOut();
+        return;
       }
 
+      /* ===============================
+         4️⃣ VERIFY PROFILE EXISTS
+         =============================== */
+      const collectionName =
+        role === "operator" ? "operators" : "users";
+
+      const profileSnap = await getDoc(
+        doc(db, collectionName, uid)
+      );
+
+      if (!profileSnap.exists()) {
+        setError(
+          role === "operator"
+            ? "Operator profile not found"
+            : "Admin profile not found"
+        );
+        await auth.signOut();
+        return;
+      }
+
+      /* ===============================
+         5️⃣ STORE SESSION (UI ONLY)
+         =============================== */
+      localStorage.setItem("role", role);
+      localStorage.setItem("uid", uid);
+
+      /* ===============================
+         6️⃣ REDIRECT (CLAIM-BASED)
+         =============================== */
+      if (role === "admin") {
+        router.replace("/dashboard/admin");
+      } else {
+        router.replace("/dashboard/operator");
+      }
     } catch (err) {
-      console.error(err);
+      console.error("LOGIN ERROR:", err);
       setError("Invalid email or password");
     } finally {
       setLoading(false);
@@ -80,12 +111,12 @@ export default function Login() {
         </h2>
 
         {error && (
-          <p className="text-red-500 text-sm mb-3">
+          <p className="text-red-500 text-sm mb-3 text-center">
             {error}
           </p>
         )}
 
-        {/* LOGIN TYPE */}
+        {/* UI ROLE SELECT (VALIDATION ONLY) */}
         <label className="text-sm font-semibold text-gray-700 mb-1 block">
           Login As
         </label>

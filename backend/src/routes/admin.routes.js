@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { admin } = require("../config/firebase");
 const { verifyToken, requireAdmin } = require("../middleware/auth");
+const { logOperatorActivity } = require("../utils/logOperatorActivity");
 
 /* ======================================================
    ➕ CREATE OPERATOR (ADMIN ONLY)
@@ -13,7 +14,6 @@ router.post(
   async (req, res) => {
     const { email, password, cameras } = req.body;
 
-    // 🔒 Validation
     if (
       !email ||
       !password ||
@@ -30,30 +30,26 @@ router.post(
 
     let userRecord;
 
-    // Retry helpers (network-safe)
-    const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-    const isNetworkTimeout = (error) =>
-      error?.errorInfo?.code === "app/network-timeout" ||
-      /timeout/i.test(error?.message || "");
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const isNetworkTimeout = (e) =>
+      e?.errorInfo?.code === "app/network-timeout" ||
+      /timeout/i.test(e?.message || "");
 
     const createUserWithRetry = async (payload, attempts = 3) => {
       let lastError;
-      for (let attempt = 1; attempt <= attempts; attempt++) {
+      for (let i = 1; i <= attempts; i++) {
         try {
           return await admin.auth().createUser(payload);
-        } catch (error) {
-          lastError = error;
-          if (!isNetworkTimeout(error) || attempt === attempts) {
-            throw error;
-          }
-          await sleep(500 * attempt);
+        } catch (err) {
+          lastError = err;
+          if (!isNetworkTimeout(err) || i === attempts) throw err;
+          await sleep(500 * i);
         }
       }
       throw lastError;
     };
 
     try {
-      // 1️⃣ Create Firebase Auth user
       userRecord = await createUserWithRetry({
         email,
         password,
@@ -63,7 +59,12 @@ router.post(
 
       const uid = userRecord.uid;
 
-      // 2️⃣ Create Firestore operator profile
+      // 🔐 REQUIRED: SET AUTH CLAIM
+      await admin.auth().setCustomUserClaims(uid, {
+        role: "operator",
+      });
+
+      // 📦 STORE PROFILE
       await admin.firestore().collection("operators").doc(uid).set({
         email,
         role: "operator",
@@ -73,20 +74,29 @@ router.post(
         createdBy: req.user.uid,
       });
 
+      // 🧾 LOG
+      await logOperatorActivity({
+        operatorUid: uid,
+        operatorEmail: email,
+        action: "OPERATOR_CREATED",
+        description: "Admin created a new operator",
+        metadata: { createdBy: req.user.uid },
+      });
+
       return res.status(201).json({
         success: true,
         uid,
-        message: "Operator created successfully",
+        message: "Operator created successfully. Operator must re-login.",
       });
     } catch (err) {
       console.error("❌ CREATE OPERATOR ERROR:", err);
 
-      // Rollback Auth user if Firestore fails
+      // rollback auth user if firestore fails
       if (userRecord?.uid) {
         try {
           await admin.auth().deleteUser(userRecord.uid);
-        } catch (rollbackErr) {
-          console.error("⚠️ Rollback failed:", rollbackErr.message);
+        } catch (rbErr) {
+          console.error("⚠️ Rollback failed:", rbErr.message);
         }
       }
 
@@ -116,22 +126,152 @@ router.post(
         });
       }
 
-      await admin.auth().updateUser(uid, {
-        password: newPassword,
+      await admin.auth().updateUser(uid, { password: newPassword });
+
+      await logOperatorActivity({
+        operatorUid: uid,
+        operatorEmail: "unknown",
+        action: "PASSWORD_RESET",
+        description: "Admin reset operator password",
+        metadata: { resetBy: req.user.uid },
       });
 
-      return res.status(200).json({
+      res.json({
         success: true,
         message: "Operator password reset successfully",
       });
     } catch (err) {
       console.error("❌ RESET PASSWORD ERROR:", err);
-      return res.status(500).json({
+      res.status(500).json({
         success: false,
         message: err.message || "Failed to reset password",
       });
     }
   }
 );
+
+/* ======================================================
+   📜 FETCH OPERATOR LOGS (ADMIN ONLY)
+   ====================================================== */
+router.get(
+  "/operator-logs",
+  verifyToken,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { operatorUid, limit = 50 } = req.query;
+
+      let q = admin
+        .firestore()
+        .collection("operator_logs")
+        .orderBy("createdAt", "desc")
+        .limit(Number(limit));
+
+      if (operatorUid) {
+        q = q.where("operatorUid", "==", operatorUid);
+      }
+
+      const snap = await q.get();
+      const logs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+      res.json({ success: true, logs });
+    } catch (err) {
+      console.error("FETCH LOGS ERROR:", err);
+      res.status(500).json({
+        success: false,
+        message: "Failed to fetch operator logs",
+      });
+    }
+  }
+);
+
+/* ======================================================
+   🧪 TEST LOG (ADMIN ONLY)
+   ====================================================== */
+router.get(
+  "/_test-log",
+  verifyToken,
+  requireAdmin,
+  async (req, res) => {
+    await logOperatorActivity({
+      operatorUid: req.user.uid,
+      operatorEmail: req.user.email,
+      action: "TEST",
+      description: "Test log created manually",
+    });
+
+    res.json({ success: true });
+  }
+);
+
+/* ======================================================
+   👑 MAKE ADMIN (BOOTSTRAP / ADMIN ONLY)
+   ====================================================== */
+/**
+ * ⚠️ IMPORTANT:
+ * - Use this ONCE to bootstrap first admin
+ * - After that, keep verifyToken + requireAdmin enabled
+ */
+router.post(
+  "/_make-admin",
+  verifyToken,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const { uid } = req.body;
+
+      if (!uid) {
+        return res.status(400).json({
+          success: false,
+          message: "UID is required",
+        });
+      }
+
+      await admin.auth().setCustomUserClaims(uid, {
+        role: "admin",
+      });
+
+      res.json({
+        success: true,
+        message: "Admin role assigned. Please logout and login again.",
+      });
+    } catch (err) {
+      console.error("MAKE ADMIN ERROR:", err);
+      res.status(500).json({
+        success: false,
+        message: "Failed to assign admin role",
+      });
+    }
+  }
+);
+
+router.post("/_make-operator", async (req, res) => {
+  try {
+    const { uid } = req.body;
+
+    if (!uid) {
+      return res.status(400).json({
+        success: false,
+        message: "UID is required",
+      });
+    }
+
+    await admin.auth().setCustomUserClaims(uid, {
+      role: "operator",
+    });
+
+    return res.json({
+      success: true,
+      message: "Operator role assigned. Please re-login.",
+    });
+  } catch (err) {
+    console.error("MAKE OPERATOR ERROR:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to assign operator role",
+    });
+  }
+});
+
 
 module.exports = router;

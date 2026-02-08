@@ -1,51 +1,64 @@
 const { admin } = require("../config/firebase");
+const { logOperatorActivity } = require("../utils/logOperatorActivity");
 
-/**
- * Verify Firebase Auth token
- */
+/* =========================================
+   🔐 VERIFY TOKEN (FINAL)
+   ========================================= */
 const verifyToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return res.status(401).json({ message: "No token provided" });
+      return res.status(401).json({
+        success: false,
+        message: "Authorization token missing",
+      });
     }
 
     const token = authHeader.split(" ")[1];
 
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    req.user = decodedToken; // uid, email, etc.
+    // ✅ Verify Firebase ID token
+    const decoded = await admin.auth().verifyIdToken(token);
 
-    next();
-  } catch (error) {
-    return res.status(401).json({ message: "Invalid or expired token" });
-  }
-};
+    // ✅ Attach user to request
+    req.user = {
+      uid: decoded.uid,
+      email: decoded.email || null,
+      role: decoded.role || null,
+    };
 
-/**
- * Allow only ADMIN users
- */
-const requireAdmin = async (req, res, next) => {
-  try {
-    const uid = req.user.uid;
-
-    const userDoc = await admin
-      .firestore()
-      .collection("users")
-      .doc(uid)
-      .get();
-
-    if (!userDoc.exists || userDoc.data().role !== "admin") {
-      return res.status(403).json({ message: "Admin access required" });
+    // ✅ Log operator login (non-blocking)
+    if (decoded.role === "operator") {
+      logOperatorActivity({
+        operatorUid: decoded.uid,
+        operatorEmail: decoded.email,
+        action: "LOGIN",
+        description: "Operator logged in",
+        ipAddress: req.ip,
+      }).catch(() => {});
     }
 
     next();
-  } catch (error) {
-    return res.status(500).json({ message: "Authorization failed" });
+  } catch (err) {
+    console.error("❌ AUTH ERROR:", err.message);
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired token",
+    });
   }
 };
 
-module.exports = {
-  verifyToken,
-  requireAdmin,
+/* =========================================
+   🛡️ REQUIRE ADMIN (FINAL)
+   ========================================= */
+const requireAdmin = (req, res, next) => {
+  if (req.user?.role !== "admin") {
+    return res.status(403).json({
+      success: false,
+      message: "Admin access required",
+    });
+  }
+  next();
 };
+
+module.exports = { verifyToken, requireAdmin };

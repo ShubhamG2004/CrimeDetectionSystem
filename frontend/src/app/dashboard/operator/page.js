@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
 import {
   collection,
+  doc,
   getDocs,
+  getDoc,
   orderBy,
   query,
+  where
 } from "firebase/firestore";
 import {
   BarChart3,
@@ -32,7 +35,6 @@ import OperatorSidebar from "@/components/OperatorSidebar";
 
 export default function OperatorDashboard() {
   const router = useRouter();
-  const checkedRef = useRef(false);
 
   const [incidents, setIncidents] = useState([]);
   const [cameraFilter, setCameraFilter] = useState("all");
@@ -40,6 +42,7 @@ export default function OperatorDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [selectedIncident, setSelectedIncident] = useState(null);
+  const [operatorCameras, setOperatorCameras] = useState(null);
   const [stats, setStats] = useState({
     total: 0,
     critical: 0,
@@ -50,52 +53,75 @@ export default function OperatorDashboard() {
 
   /* ---------- AUTH GUARD ---------- */
   useEffect(() => {
-    if (checkedRef.current) return;
-    checkedRef.current = true;
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
 
-    const unsub = onAuthStateChanged(auth, (user) => {
-      if (!user) return router.replace("/login");
       if (localStorage.getItem("role") !== "operator") {
         router.replace("/dashboard/admin");
+        return;
       }
+
+      const opRef = doc(db, "operators", user.uid);
+      const opSnap = await getDoc(opRef);
+
+      if (!opSnap.exists()) {
+        console.error("Operator profile missing");
+        return;
+      }
+
+      setOperatorCameras(opSnap.data().cameras || []);
     });
 
     return () => unsub();
   }, [router]);
 
   /* ---------- FETCH INCIDENTS ---------- */
-  useEffect(() => {
-    const fetchIncidents = async () => {
-      try {
-        setLoading(true);
+  /* ---------- FETCH INCIDENTS (FIXED & SECURE) ---------- */
+useEffect(() => {
+  if (!operatorCameras || operatorCameras.length === 0) return;
 
-        const q = query(
-          collection(db, "incidents"),
-          orderBy("createdAt", "desc")
-        );
+  const fetchIncidents = async () => {
+    try {
+      setLoading(true);
 
-        const snap = await getDocs(q);
+      /**
+       * Firestore limitation:
+       * "in" query supports max 10 values.
+       * If you ever assign >10 cameras, we’ll chunk later.
+       */
+      const q = query(
+        collection(db, "incidents"),
+        orderBy("createdAt", "desc"),
+        where("location.cameraId", "in", operatorCameras)
+      );
 
-        const list = snap.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            timestamp: data.createdAt?.toDate() || null,
-          };
-        });
+      const snap = await getDocs(q);
 
-        setIncidents(list);
-        calculateStats(list);
-      } catch (err) {
-        console.error("❌ Fetch incidents error:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
+      const list = snap.docs.map((doc) => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...data,
+          timestamp: data.createdAt?.toDate() || null,
+        };
+      });
 
-    fetchIncidents();
-  }, []);
+      setIncidents(list);
+      calculateStats(list);
+    } catch (err) {
+      console.error("❌ Fetch incidents error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchIncidents();
+}, [operatorCameras]);
+
+
 
   /* ---------- STATS ---------- */
   const calculateStats = (list) => {
@@ -120,22 +146,23 @@ export default function OperatorDashboard() {
 
   /* ---------- FILTERED INCIDENTS ---------- */
   const filteredIncidents = incidents.filter((i) => {
-    const cameraMatch =
-      cameraFilter === "all" ||
-      i.location?.cameraId === cameraFilter;
+      const cameraMatch =
+        cameraFilter === "all" ||
+        i.location?.cameraId === cameraFilter;
 
-    const severityMatch =
-      severityFilter === "all" ||
-      i.threat_level?.toLowerCase() === severityFilter;
+      const severityMatch =
+        severityFilter === "all" ||
+        i.threat_level?.toLowerCase() === severityFilter;
 
-    const searchMatch = 
-      searchQuery === "" ||
-      i.crime_type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      i.location?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      i.threat_level?.toLowerCase().includes(searchQuery.toLowerCase());
+      const searchMatch =
+        searchQuery === "" ||
+        i.crime_type?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        i.location?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        i.threat_level?.toLowerCase().includes(searchQuery.toLowerCase());
 
-    return cameraMatch && severityMatch && searchMatch;
-  });
+      return cameraMatch && severityMatch && searchMatch;
+    });
+
 
   /* ---------- HELPERS ---------- */
   const formatDate = (date) => {
