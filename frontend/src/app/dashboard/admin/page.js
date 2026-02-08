@@ -33,7 +33,7 @@ export default function AdminDashboard() {
   }, [router]); // ✅ dependency array NEVER changes
 
   return (
-    <div className="flex bg-gray-100 min-h-screen">
+    <div className="app-shell flex">
       <AdminSidebar />
 
       <div className="flex-1">
@@ -42,30 +42,30 @@ export default function AdminDashboard() {
         <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
           <a
             href="/dashboard/operator"
-            className="bg-white p-6 rounded shadow hover:shadow-lg"
+            className="app-card p-6 transition hover:shadow-md"
           >
-            <h3 className="font-bold text-lg">👮 Live Monitoring</h3>
-            <p className="text-sm text-gray-600">
+            <h3 className="font-semibold text-lg text-slate-900">👮 Live Monitoring</h3>
+            <p className="text-sm text-slate-600">
               View real-time crime alerts
             </p>
           </a>
 
           <a
             href="/analytics"
-            className="bg-white p-6 rounded shadow hover:shadow-lg"
+            className="app-card p-6 transition hover:shadow-md"
           >
-            <h3 className="font-bold text-lg">📊 Analytics</h3>
-            <p className="text-sm text-gray-600">
+            <h3 className="font-semibold text-lg text-slate-900">📊 Analytics</h3>
+            <p className="text-sm text-slate-600">
               Crime trends & statistics
             </p>
           </a>
 
           <a
             href="/cameras"
-            className="bg-white p-6 rounded shadow hover:shadow-lg"
+            className="app-card p-6 transition hover:shadow-md"
           >
-            <h3 className="font-bold text-lg">🎥 Camera Management</h3>
-            <p className="text-sm text-gray-600">
+            <h3 className="font-semibold text-lg text-slate-900">🎥 Camera Management</h3>
+            <p className="text-sm text-slate-600">
               Add / edit / remove cameras
             </p>
           </a>

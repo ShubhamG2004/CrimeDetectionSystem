@@ -29,8 +29,8 @@ export default function AnalyticsCharts({
   return (
     <>
       {/* DAILY INCIDENTS */}
-      <div className="mb-10">
-        <h2 className="font-semibold mb-2">
+      <div className="app-card p-5 mb-8">
+        <h2 className="font-semibold mb-2 text-slate-900">
           Incidents Per Day
         </h2>
 
@@ -50,10 +50,10 @@ export default function AnalyticsCharts({
         </ResponsiveContainer>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* SEVERITY PIE */}
-        <div>
-          <h2 className="font-semibold mb-2">
+        <div className="app-card p-5">
+          <h2 className="font-semibold mb-2 text-slate-900">
             Severity Distribution
           </h2>
 
@@ -79,8 +79,8 @@ export default function AnalyticsCharts({
         </div>
 
         {/* CAMERA BAR */}
-        <div>
-          <h2 className="font-semibold mb-2">
+        <div className="app-card p-5">
+          <h2 className="font-semibold mb-2 text-slate-900">
             Incidents by Camera
           </h2>
 

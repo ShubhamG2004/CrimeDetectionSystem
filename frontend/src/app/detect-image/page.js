@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
+import OperatorSidebar from "@/components/OperatorSidebar";
 import { auth } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
 
@@ -252,34 +253,40 @@ export default function ImageDetectionPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-gray-100">
-      <Navbar title="🖼️ AI Crime Image Detection" />
-
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* HEADER */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            AI-Powered Crime Detection
-          </h1>
-          <p className="text-gray-600">
-            Upload an image to detect potential crimes using pose analysis
-          </p>
+    <div className="flex h-screen bg-transparent overflow-hidden">
+      <OperatorSidebar />
+      <div className="flex-1 bg-transparent">
+        <div className="sticky top-0 z-20">
+          <Navbar title="🖼️ AI Crime Image Detection" />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* LEFT COLUMN - UPLOAD FORM */}
-          <div className="bg-white p-6 rounded-xl shadow-lg">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+        <div className="h-full overflow-y-auto">
+          <div className="max-w-5xl mx-auto px-4 py-8">
+          {/* HEADER */}
+          <div className="text-center mb-8">
+            <div className="app-badge mx-auto w-fit">Image analysis</div>
+            <h1 className="mt-4 text-3xl font-semibold text-slate-900 mb-2">
+              AI-Powered Crime Detection
+            </h1>
+            <p className="text-slate-600">
+              Upload an image to detect potential crimes using pose analysis
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* LEFT COLUMN - UPLOAD FORM */}
+            <div className="app-card p-6">
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">
               Upload & Detect
             </h2>
 
             {/* CAMERA SELECTION */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
                 Select Camera *
               </label>
               <select
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="app-input"
                 value={selectedCameraId}
                 onChange={(e) => handleCameraChange(e.target.value)}
               >
@@ -291,16 +298,16 @@ export default function ImageDetectionPage() {
                 ))}
               </select>
               {cameras.length === 0 && (
-                <p className="text-sm text-gray-500 mt-2">
+                <p className="text-sm text-slate-500 mt-2">
                   No cameras assigned to you
                 </p>
               )}
               {selectedCamera && (
-                <div className="mt-2 p-3 bg-blue-50 rounded-lg">
-                  <p className="text-sm font-medium text-blue-800">
+                <div className="mt-2 p-3 bg-cyan-50 rounded-lg">
+                  <p className="text-sm font-medium text-cyan-800">
                     📍 {selectedCamera.area}
                   </p>
-                  <p className="text-xs text-blue-600">
+                  <p className="text-xs text-cyan-600">
                     Lat: {selectedCamera.latitude}, Lng: {selectedCamera.longitude}
                   </p>
                 </div>
@@ -309,10 +316,10 @@ export default function ImageDetectionPage() {
 
             {/* IMAGE UPLOAD */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
                 Select Image *
               </label>
-              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-blue-400 transition-colors">
+              <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-cyan-400 transition-colors">
                 <input
                   type="file"
                   accept="image/*"
@@ -338,20 +345,20 @@ export default function ImageDetectionPage() {
                           setPreview(null);
                           setImage(null);
                         }}
-                        className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full hover:bg-red-600"
+                        className="absolute top-2 right-2 bg-rose-500 text-white p-1 rounded-full hover:bg-rose-600"
                       >
                         ✕
                       </button>
                     </div>
                   ) : (
                     <>
-                      <div className="mx-auto w-12 h-12 mb-3 text-gray-400">
+                      <div className="mx-auto w-12 h-12 mb-3 text-slate-400">
                         📷
                       </div>
-                      <p className="text-gray-500">
+                      <p className="text-slate-500">
                         Click to upload image
                       </p>
-                      <p className="text-sm text-gray-400 mt-1">
+                      <p className="text-sm text-slate-400 mt-1">
                         Supports JPG, PNG, BMP (max 16MB)
                       </p>
                     </>
@@ -362,7 +369,7 @@ export default function ImageDetectionPage() {
 
             {/* ERROR MESSAGE */}
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600">
+              <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg text-rose-600">
                 ⚠️ {error}
               </div>
             )}
@@ -372,7 +379,7 @@ export default function ImageDetectionPage() {
               <button
                 onClick={submitImage}
                 disabled={loading || !image || !selectedCamera}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2"
+                className="flex-1 app-button disabled:opacity-50 disabled:bg-slate-400"
               >
                 {loading ? (
                   <>
@@ -387,16 +394,16 @@ export default function ImageDetectionPage() {
               </button>
               <button
                 onClick={resetForm}
-                className="px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                className="px-4 py-3 border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors text-slate-700"
               >
                 Clear
               </button>
             </div>
 
             {/* INFO TIPS */}
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <h4 className="font-medium text-blue-800 mb-2">💡 Tips:</h4>
-              <ul className="text-sm text-blue-700 space-y-1">
+            <div className="mt-6 p-4 bg-cyan-50 rounded-lg">
+              <h4 className="font-medium text-cyan-800 mb-2">💡 Tips:</h4>
+              <ul className="text-sm text-cyan-700 space-y-1">
                 <li>• Ensure people are clearly visible in the image</li>
                 <li>• Well-lit images work better for detection</li>
                 <li>• Multiple people interactions will be analyzed</li>
@@ -407,8 +414,8 @@ export default function ImageDetectionPage() {
           </div>
 
           {/* RIGHT COLUMN - RESULTS */}
-          <div className="bg-white p-6 rounded-xl shadow-lg">
-            <h2 className="text-xl font-semibold text-gray-800 mb-4">
+            <div className="app-card p-6">
+            <h2 className="text-xl font-semibold text-slate-900 mb-4">
               Detection Results
             </h2>
 
@@ -424,34 +431,34 @@ export default function ImageDetectionPage() {
                       {result.crime_detected ? 'ALERT' : 'SAFE'}
                     </span>
                   </div>
-                  <p className="text-gray-700">
+                  <p className="text-slate-700">
                     {getCrimeTypeDisplay(result)}
                   </p>
                 </div>
 
                 {/* METRICS GRID */}
                 <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="text-sm text-gray-500">Confidence</div>
-                    <div className="text-2xl font-bold text-blue-600">
+                  <div className="bg-slate-50 p-4 rounded-lg">
+                    <div className="text-sm text-slate-500">Confidence</div>
+                    <div className="text-2xl font-bold text-cyan-700">
                       {Math.round((result.confidence || 0) * 100)}%
                     </div>
                   </div>
                   <div className={`p-4 rounded-lg ${getThreatBgColor(result.threat_level)}`}>
-                    <div className="text-sm text-gray-500">Threat Level</div>
+                    <div className="text-sm text-slate-500">Threat Level</div>
                     <div className={`text-xl font-bold ${getThreatColor(result.threat_level)}`}>
                       {result.threat_level || "LOW"}
                     </div>
                   </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="text-sm text-gray-500">People Detected</div>
-                    <div className="text-2xl font-bold text-gray-800">
+                  <div className="bg-slate-50 p-4 rounded-lg">
+                    <div className="text-sm text-slate-500">People Detected</div>
+                    <div className="text-2xl font-bold text-slate-800">
                       {result.persons_detected || 0}
                     </div>
                   </div>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="text-sm text-gray-500">Threat Score</div>
-                    <div className="text-2xl font-bold text-gray-800">
+                  <div className="bg-slate-50 p-4 rounded-lg">
+                    <div className="text-sm text-slate-500">Threat Score</div>
+                    <div className="text-2xl font-bold text-slate-800">
                       {result.threat_score || 0}/100
                     </div>
                   </div>
@@ -531,6 +538,8 @@ export default function ImageDetectionPage() {
                 </p>
               </div>
             )}
+          </div>
+          </div>
           </div>
         </div>
       </div>

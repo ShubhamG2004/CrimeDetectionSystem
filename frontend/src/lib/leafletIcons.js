@@ -12,68 +12,38 @@ L.Icon.Default.mergeOptions({
 // Custom threat level icons with better design
 export const threatIcons = {
   LOW: L.divIcon({
-    html: '<div class="bg-green-600 border-2 border-white rounded-full w-6 h-6 flex items-center justify-center text-white font-bold text-xs">L</div>',
+    html: '<div class="incident-marker incident-marker--low"><span>1</span></div>',
     className: 'custom-div-icon',
-    iconSize: [24, 24],
-    iconAnchor: [12, 12],
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
   }),
   MEDIUM: L.divIcon({
-    html: '<div class="bg-yellow-600 border-2 border-white rounded-full w-8 h-8 flex items-center justify-center text-white font-bold text-xs">M</div>',
+    html: '<div class="incident-marker incident-marker--medium"><span>1</span></div>',
     className: 'custom-div-icon',
-    iconSize: [28, 28],
-    iconAnchor: [14, 14],
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
   }),
   HIGH: L.divIcon({
-    html: '<div class="bg-orange-600 border-2 border-white rounded-full w-10 h-10 flex items-center justify-center text-white font-bold text-sm">H</div>',
+    html: '<div class="incident-marker incident-marker--high"><span>1</span></div>',
     className: 'custom-div-icon',
-    iconSize: [32, 32],
-    iconAnchor: [16, 16],
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
   }),
   CRITICAL: L.divIcon({
-    html: '<div class="bg-red-600 border-2 border-white rounded-full w-12 h-12 flex items-center justify-center text-white font-bold text-sm">C</div>',
+    html: '<div class="incident-marker incident-marker--critical"><span>1</span></div>',
     className: 'custom-div-icon',
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
   }),
 };
 
 // Crime type icons mapping
 export const crimeTypeIcons = {
-  theft: L.divIcon({
-    html: '👜',
-    className: 'text-2xl bg-white bg-opacity-75 rounded-full p-1',
-    iconSize: [40, 40],
-    iconAnchor: [20, 40],
-  }),
-  assault: L.divIcon({
-    html: '👊',
-    className: 'text-2xl bg-white bg-opacity-75 rounded-full p-1',
-    iconSize: [40, 40],
-    iconAnchor: [20, 40],
-  }),
-  burglary: L.divIcon({
-    html: '🏠',
-    className: 'text-2xl bg-white bg-opacity-75 rounded-full p-1',
-    iconSize: [40, 40],
-    iconAnchor: [20, 40],
-  }),
-  vandalism: L.divIcon({
-    html: '🎨',
-    className: 'text-2xl bg-white bg-opacity-75 rounded-full p-1',
-    iconSize: [40, 40],
-    iconAnchor: [20, 40],
-  }),
-  traffic: L.divIcon({
-    html: '🚗',
-    className: 'text-2xl bg-white bg-opacity-75 rounded-full p-1',
-    iconSize: [40, 40],
-    iconAnchor: [20, 40],
-  }),
   default: L.divIcon({
-    html: '📍',
-    className: 'text-2xl bg-white bg-opacity-75 rounded-full p-1',
-    iconSize: [40, 40],
-    iconAnchor: [20, 40],
+    html: '<div class="incident-marker incident-marker--medium"><span>1</span></div>',
+    className: 'custom-div-icon',
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
   }),
 };
 

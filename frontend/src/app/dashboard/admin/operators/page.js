@@ -217,7 +217,7 @@ export default function ManageOperators() {
   );
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="app-shell flex">
       <AdminSidebar />
 
       <div className="flex-1">
@@ -226,21 +226,24 @@ export default function ManageOperators() {
         <div className="p-6">
           {/* HEADER */}
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">
-              Operators
-            </h2>
+            <div>
+              <div className="app-badge">Team management</div>
+              <h2 className="text-2xl font-semibold text-slate-900 mt-2">
+                Operators
+              </h2>
+            </div>
             <button
               onClick={() => setShowModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg shadow transition duration-200"
+              className="app-button"
             >
               ➕ Add Operator
             </button>
           </div>
 
           {/* TABLE */}
-          <div className="overflow-x-auto bg-white rounded-lg shadow">
+          <div className="overflow-x-auto app-card">
             <table className="w-full">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-slate-100 border-b border-slate-200">
                 <tr>
                   <th className="p-4 text-left font-semibold text-gray-700">Email</th>
                   <th className="p-4 text-left font-semibold text-gray-700">Cameras</th>
@@ -250,9 +253,9 @@ export default function ManageOperators() {
                 </tr>
               </thead>
 
-              <tbody className="text-gray-800">
+              <tbody className="text-slate-800">
                 {operators.map((op) => (
-                  <tr key={op.uid} className="border-t hover:bg-gray-50 transition duration-150">
+                  <tr key={op.uid} className="border-t border-slate-100 hover:bg-slate-50/70 transition duration-150">
                     <td className="p-4">{op.email}</td>
 
                     <td className="p-4">
@@ -335,18 +338,18 @@ export default function ManageOperators() {
         {/* ADD/EDIT MODAL */}
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-xl w-[440px] p-6 shadow-xl">
-              <h3 className="font-bold text-xl mb-6 text-gray-800">
+            <div className="app-card w-[440px] p-6">
+              <h3 className="font-semibold text-xl mb-6 text-slate-800">
                 {editingUid ? "Edit Operator" : "Add Operator"}
               </h3>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Operator Email
                   </label>
                   <input
-                    className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                    className="app-input"
                     placeholder="operator@example.com"
                     value={form.email}
                     disabled={!!editingUid}
@@ -358,12 +361,12 @@ export default function ManageOperators() {
 
                 {!editingUid && (
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-700 mb-1">
                       Temporary Password
                     </label>
                     <input
                       type="password"
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                      className="app-input"
                       placeholder="Enter password"
                       value={form.password}
                       onChange={(e) =>
@@ -378,12 +381,12 @@ export default function ManageOperators() {
 
                 {/* SEARCHABLE DROPDOWN */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-slate-700 mb-1">
                     Assign Cameras
                   </label>
                   <div ref={dropdownRef} className="relative">
                     <input
-                      className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition"
+                      className="app-input"
                       placeholder="Search cameras by name or area..."
                       value={search}
                       onChange={(e) => {
@@ -394,21 +397,21 @@ export default function ManageOperators() {
                     />
 
                     {dropdownOpen && (
-                      <div className="absolute z-10 mt-1 bg-white border border-gray-300 rounded-lg w-full max-h-48 overflow-y-auto shadow-lg">
+                      <div className="absolute z-10 mt-1 bg-white border border-slate-200 rounded-lg w-full max-h-48 overflow-y-auto shadow-lg">
                         <div className="p-2">
                           {filteredCameras.length === 0 ? (
-                            <p className="p-2 text-gray-500 text-sm text-center">
+                            <p className="p-2 text-slate-500 text-sm text-center">
                               No cameras found
                             </p>
                           ) : (
                             filteredCameras.map((cam) => (
                               <label
                                 key={cam.id}
-                                className="flex items-center gap-3 p-3 hover:bg-gray-50 cursor-pointer rounded-md transition"
+                                className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer rounded-md transition"
                               >
                                 <input
                                   type="checkbox"
-                                  className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                                  className="w-4 h-4 text-cyan-600 rounded focus:ring-cyan-400"
                                   checked={form.cameras.includes(cam.id)}
                                   onChange={(e) => {
                                     const updated = e.target.checked
@@ -423,8 +426,8 @@ export default function ManageOperators() {
                                   }}
                                 />
                                 <div>
-                                  <p className="font-medium text-gray-800">{cam.name}</p>
-                                  <p className="text-xs text-gray-500">{cam.area}</p>
+                                  <p className="font-medium text-slate-800">{cam.name}</p>
+                                  <p className="text-xs text-slate-500">{cam.area}</p>
                                 </div>
                               </label>
                             ))
@@ -437,14 +440,14 @@ export default function ManageOperators() {
                   {/* Selected cameras preview */}
                   {form.cameras.length > 0 && (
                     <div className="mt-3">
-                      <p className="text-sm font-medium text-gray-700 mb-1">Selected ({form.cameras.length}):</p>
+                      <p className="text-sm font-medium text-slate-700 mb-1">Selected ({form.cameras.length}):</p>
                       <div className="flex flex-wrap gap-1.5">
                         {form.cameras.map((id) => {
                           const cam = cameras.find(c => c.id === id);
                           return (
                             <span
                               key={id}
-                              className="px-2.5 py-1 bg-blue-100 text-blue-700 rounded-md text-xs font-medium"
+                              className="px-2.5 py-1 bg-cyan-100 text-cyan-700 rounded-md text-xs font-medium"
                             >
                               {cam?.name || id}
                             </span>
@@ -457,10 +460,10 @@ export default function ManageOperators() {
               </div>
 
               {/* ACTIONS */}
-              <div className="flex justify-end gap-3 mt-8 pt-6 border-t">
+              <div className="flex justify-end gap-3 mt-8 pt-6 border-t border-slate-200">
                 <button
                   onClick={closeModal}
-                  className="px-5 py-2.5 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition duration-200"
+                  className="px-5 py-2.5 border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition duration-200"
                 >
                   Cancel
                 </button>
@@ -468,7 +471,7 @@ export default function ManageOperators() {
                   onClick={
                     editingUid ? updateOperator : addOperator
                   }
-                  className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition duration-200"
+                  className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-medium transition duration-200"
                 >
                   Save Changes
                 </button>
@@ -480,14 +483,14 @@ export default function ManageOperators() {
         {/* RESET PASSWORD MODAL */}
         {resetUid && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg w-[360px] p-6">
-              <h3 className="font-bold text-lg mb-4">
+            <div className="app-card w-[360px] p-6">
+              <h3 className="font-semibold text-lg mb-4 text-slate-800">
                 🔐 Reset Operator Password
               </h3>
 
               <input
                 type="password"
-                className="w-full p-2 border rounded mb-4"
+                className="app-input mb-4"
                 placeholder="New Password"
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
@@ -499,13 +502,13 @@ export default function ManageOperators() {
                     setResetUid(null);
                     setNewPassword("");
                   }}
-                  className="px-4 py-1 border rounded"
+                  className="px-4 py-1 border border-slate-300 rounded-lg text-slate-700"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={resetPassword}
-                  className="px-4 py-1 bg-red-600 text-white rounded"
+                  className="px-4 py-1 bg-rose-600 text-white rounded-lg"
                 >
                   Reset
                 </button>

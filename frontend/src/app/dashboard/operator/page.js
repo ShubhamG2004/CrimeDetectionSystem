@@ -270,22 +270,26 @@ useEffect(() => {
   };
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
+    <div className="flex h-screen bg-transparent overflow-hidden">
       <OperatorSidebar />
 
-      <div className="flex-1 overflow-hidden">
-        <Navbar title="👮 Operator Dashboard" />
+      <div className="flex-1 bg-transparent">
+        <div className="sticky top-0 z-20">
+          <Navbar title="👮 Operator Dashboard" />
+        </div>
 
-        <div className="p-6 space-y-6">
+        <div className="h-full overflow-y-auto">
+          <div className="p-6 space-y-6">
           {/* HEADER */}
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">Incident Management</h1>
-              <p className="text-gray-600 mt-1">Monitor and respond to security incidents in real-time</p>
+              <div className="app-badge">Operator workspace</div>
+              <h1 className="mt-3 text-2xl font-semibold text-slate-900">Incident Management</h1>
+              <p className="text-slate-600 mt-1">Monitor and respond to security incidents in real-time</p>
             </div>
             <button
               onClick={exportIncidents}
-              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors shadow-sm"
+              className="flex items-center gap-2 px-4 py-2.5 bg-white border border-slate-300 text-slate-700 rounded-xl hover:bg-slate-50 transition-colors shadow-sm"
             >
               <Download className="w-4 h-4" />
               Export CSV
@@ -632,6 +636,7 @@ useEffect(() => {
                 Last updated {formatDate(new Date(Math.max(...incidents.map(i => i.timestamp?.getTime() || 0))))}
               </span>
             )}
+          </div>
           </div>
         </div>
       </div>

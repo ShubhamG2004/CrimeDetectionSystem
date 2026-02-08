@@ -34,43 +34,24 @@ function FitBounds({ incidents }) {
 // Map controls component
 function MapControls() {
   const map = useMap();
-  const [zoom, setZoom] = useState(map.getZoom());
-
-  useEffect(() => {
-    const updateZoom = () => setZoom(map.getZoom());
-    map.on('zoom', updateZoom);
-    return () => {
-      map.off('zoom', updateZoom);
-    };
-  }, [map]);
-
   return (
-    <div className="leaflet-top leaflet-right">
-      <div className="leaflet-control leaflet-bar bg-white p-2 rounded-lg shadow-md">
-        <div className="text-sm font-medium text-gray-700">
-          Zoom: {zoom}
-        </div>
-        <div className="flex gap-2 mt-2">
-          <button
-            onClick={() => map.zoomIn()}
-            className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            +
-          </button>
-          <button
-            onClick={() => map.zoomOut()}
-            className="px-2 py-1 bg-blue-500 text-white rounded hover:bg-blue-600"
-          >
-            -
-          </button>
-          <button
-            onClick={() => map.locate({setView: true, maxZoom: 16})}
-            className="px-2 py-1 bg-green-500 text-white rounded hover:bg-green-600 text-sm"
-            title="Locate Me"
-          >
-            📍
-          </button>
-        </div>
+    <div className="absolute top-1/2 right-6 -translate-y-1/2 z-[1000]">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-lg overflow-hidden">
+        <button
+          onClick={() => map.zoomIn()}
+          className="w-11 h-11 text-base font-semibold text-slate-900 hover:bg-slate-100"
+          aria-label="Zoom in"
+        >
+          +
+        </button>
+        <div className="h-px bg-gray-200" />
+        <button
+          onClick={() => map.zoomOut()}
+          className="w-11 h-11 text-base font-semibold text-slate-900 hover:bg-slate-100"
+          aria-label="Zoom out"
+        >
+          -
+        </button>
       </div>
     </div>
   );
@@ -86,9 +67,9 @@ function ThreatCircles({ incidents }) {
         const threatScore = incident.threat_score || 50;
         const radius = threatScore * 2; // Scale radius based on threat score
         
-        let color = '#10B981'; // green for low
-        if (threatScore > 70) color = '#EF4444'; // red for high
-        else if (threatScore > 40) color = '#F59E0B'; // yellow for medium
+        let color = '#10B981';
+        if (threatScore > 70) color = '#EF4444';
+        else if (threatScore > 40) color = '#F59E0B';
         
         return (
           <Circle
@@ -101,6 +82,12 @@ function ThreatCircles({ incidents }) {
               weight: 1,
               opacity: 0.3,
               fillOpacity: 0.1,
+              className:
+                threatScore > 70
+                  ? "threat-radius threat-radius--high"
+                  : threatScore > 40
+                    ? "threat-radius threat-radius--medium"
+                    : "threat-radius",
             }}
           >
             <Tooltip permanent={false} direction="top">
@@ -171,10 +158,10 @@ function IncidentMarkers({ incidents, showCircles }) {
   }, [incidents]);
 
   const clusterIcon = (count) => L.divIcon({
-    html: `<div class="bg-red-600 text-white rounded-full w-10 h-10 flex items-center justify-center font-bold border-2 border-white">${count}</div>`,
-    className: 'custom-div-icon',
-    iconSize: [40, 40],
-    iconAnchor: [20, 20],
+    html: `<div class="incident-marker incident-marker--critical"><span>${count}</span></div>`,
+    className: "custom-div-icon",
+    iconSize: [42, 42],
+    iconAnchor: [21, 21],
   });
 
   return (
@@ -285,6 +272,7 @@ function IncidentMarkers({ incidents, showCircles }) {
 export default function EnhancedLeafletMap({ incidents }) {
   const [showThreatCircles, setShowThreatCircles] = useState(false);
   const [mapType, setMapType] = useState('street');
+  const [mapRef, setMapRef] = useState(null);
 
   const tileLayers = {
     street: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
@@ -299,31 +287,29 @@ export default function EnhancedLeafletMap({ incidents }) {
   }, [incidents]);
 
   return (
-    <div className="relative">
-      <div className="absolute top-4 left-4 z-[1000] flex flex-col gap-2">
-        <div className="bg-white rounded-lg shadow-lg p-3">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showThreatCircles}
-              onChange={(e) => setShowThreatCircles(e.target.checked)}
-              className="rounded text-blue-600"
-            />
-            <span className="text-sm font-medium">Show Threat Radius</span>
-          </label>
-        </div>
-        
-        <div className="bg-white rounded-lg shadow-lg p-3">
-          <div className="text-sm font-medium mb-2">Map Style</div>
-          <div className="flex flex-wrap gap-1">
-            {Object.entries(tileLayers).map(([key, url]) => (
+    <div className="relative map-premium">
+      <div className="absolute top-24 left-6 z-[1000] bg-white rounded-2xl border border-gray-200 shadow-[0_20px_50px_rgba(0,0,0,0.15)] backdrop-blur-md p-4 space-y-4">
+        <label className="flex items-center gap-2 text-[13px] text-slate-900 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={showThreatCircles}
+            onChange={(e) => setShowThreatCircles(e.target.checked)}
+            className="rounded text-slate-900"
+          />
+          Show Threat Radius
+        </label>
+
+        <div>
+          <div className="text-[13px] font-medium text-slate-900 mb-2">Map Style</div>
+          <div className="flex flex-wrap gap-2">
+            {Object.entries(tileLayers).map(([key]) => (
               <button
                 key={key}
                 onClick={() => setMapType(key)}
-                className={`px-3 py-1 rounded text-sm capitalize ${
+                className={`px-3 py-1.5 rounded-[10px] text-[12px] capitalize ${
                   mapType === key
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                    ? "bg-slate-950 text-white"
+                    : "bg-slate-50 text-slate-700 hover:bg-slate-100"
                 }`}
               >
                 {key}
@@ -331,14 +317,24 @@ export default function EnhancedLeafletMap({ incidents }) {
             ))}
           </div>
         </div>
+
+        <button
+          onClick={() => mapRef?.locate({ setView: true, maxZoom: 16 })}
+          className="w-full rounded-[10px] border border-gray-200 bg-white px-3 py-2 text-[12px] font-medium text-slate-700 hover:bg-slate-50"
+        >
+          Locate Me
+        </button>
       </div>
 
       <MapContainer
         center={initialCenter}
         zoom={13}
-        className="h-[520px] w-full rounded-xl shadow-lg"
+        className="h-[520px] w-full"
         scrollWheelZoom={true}
         zoomControl={false}
+        whenCreated={(map) => {
+          setMapRef(map);
+        }}
       >
         <TileLayer
           url={tileLayers[mapType]}

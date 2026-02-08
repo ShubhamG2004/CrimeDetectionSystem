@@ -106,7 +106,7 @@ export default function ManageCameras() {
   };
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="app-shell flex">
       <AdminSidebar />
 
       <div className="flex-1">
@@ -115,25 +115,28 @@ export default function ManageCameras() {
         <div className="p-6">
           {/* HEADER */}
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-2xl font-bold text-gray-800">
-              Cameras
-            </h2>
+            <div>
+              <div className="app-badge">Infrastructure</div>
+              <h2 className="text-2xl font-semibold text-slate-900 mt-2">
+                Cameras
+              </h2>
+            </div>
             <button
               onClick={() => {
                 setShowModal(true);
                 setForm(emptyForm);
                 setEditingId(null);
               }}
-              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded shadow"
+              className="app-button"
             >
               ➕ Add Camera
             </button>
           </div>
 
           {/* TABLE */}
-          <div className="overflow-x-auto bg-white rounded shadow">
+          <div className="overflow-x-auto app-card">
             <table className="w-full">
-              <thead className="bg-gray-200 text-gray-800 text-sm">
+              <thead className="bg-slate-100 text-slate-700 text-sm">
                 <tr>
                   <th className="p-3 text-left">Name</th>
                   <th className="p-3 text-left">Area</th>
@@ -144,11 +147,11 @@ export default function ManageCameras() {
                 </tr>
               </thead>
 
-              <tbody className="text-gray-800 text-sm">
+              <tbody className="text-slate-800 text-sm">
                 {cameras.map((cam) => (
                   <tr
                     key={cam.cameraId}
-                    className="border-t hover:bg-gray-50"
+                    className="border-t border-slate-100 hover:bg-slate-50/70"
                   >
                     <td className="p-3 font-medium">
                       {cam.name}
@@ -164,8 +167,8 @@ export default function ManageCameras() {
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-semibold ${
                           cam.active
-                            ? "bg-green-100 text-green-700"
-                            : "bg-red-100 text-red-700"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-rose-100 text-rose-700"
                         }`}
                       >
                         {cam.active ? "Active" : "Inactive"}
@@ -178,7 +181,7 @@ export default function ManageCameras() {
                           setForm(cam);
                           setShowModal(true);
                         }}
-                        className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded"
+                        className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white text-xs rounded"
                       >
                         Edit
                       </button>
@@ -186,7 +189,7 @@ export default function ManageCameras() {
                         onClick={() =>
                           deleteCamera(cam.cameraId)
                         }
-                        className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white text-xs rounded"
+                        className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs rounded"
                       >
                         Delete
                       </button>
@@ -197,7 +200,7 @@ export default function ManageCameras() {
             </table>
 
             {cameras.length === 0 && (
-              <p className="p-6 text-center text-gray-600 font-medium">
+              <p className="p-6 text-center text-slate-600 font-medium">
                 No cameras found
               </p>
             )}
@@ -207,13 +210,13 @@ export default function ManageCameras() {
         {/* MODAL */}
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg w-[420px] p-6">
-              <h3 className="font-bold text-lg text-gray-800 mb-4">
+            <div className="app-card w-[420px] p-6">
+              <h3 className="font-semibold text-lg text-slate-800 mb-4">
                 {editingId ? "Edit Camera" : "Add Camera"}
               </h3>
 
               <input
-                className="w-full p-2 border rounded mb-2 text-gray-800"
+                className="app-input mb-2"
                 placeholder="Camera Name"
                 value={form.name}
                 onChange={(e) =>
@@ -222,7 +225,7 @@ export default function ManageCameras() {
               />
 
               <input
-                className="w-full p-2 border rounded mb-2 text-gray-800"
+                className="app-input mb-2"
                 placeholder="Area"
                 value={form.area}
                 onChange={(e) =>
@@ -232,7 +235,7 @@ export default function ManageCameras() {
 
               <input
                 type="number"
-                className="w-full p-2 border rounded mb-2 text-gray-800"
+                className="app-input mb-2"
                 placeholder="Latitude"
                 value={form.latitude}
                 onChange={(e) =>
@@ -242,7 +245,7 @@ export default function ManageCameras() {
 
               <input
                 type="number"
-                className="w-full p-2 border rounded mb-3 text-gray-800"
+                className="app-input mb-3"
                 placeholder="Longitude"
                 value={form.longitude}
                 onChange={(e) =>
@@ -250,7 +253,7 @@ export default function ManageCameras() {
                 }
               />
 
-              <label className="flex items-center gap-2 text-sm text-gray-700 mb-4">
+              <label className="flex items-center gap-2 text-sm text-slate-700 mb-4">
                 <input
                   type="checkbox"
                   checked={form.active}
@@ -267,13 +270,13 @@ export default function ManageCameras() {
               <div className="flex justify-end gap-2">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-1 border rounded text-gray-700"
+                  className="px-4 py-1 border border-slate-300 rounded-lg text-slate-700"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={saveCamera}
-                  className="px-4 py-1 bg-green-600 text-white rounded"
+                  className="px-4 py-1 bg-slate-900 text-white rounded-lg"
                 >
                   Save
                 </button>

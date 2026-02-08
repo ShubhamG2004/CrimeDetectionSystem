@@ -90,16 +90,26 @@ export default function Analytics() {
   };
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6">
-        📊 Crime Analytics Dashboard
-      </h1>
+    <div className="app-shell">
+      <div className="mx-auto max-w-6xl px-6 py-8">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <div className="app-badge">Operational insights</div>
+            <h1 className="mt-3 text-2xl font-semibold text-slate-900">
+              Crime analytics dashboard
+            </h1>
+            <p className="text-sm text-slate-600">
+              Track incident volume, severity distribution, and camera hotspots.
+            </p>
+          </div>
+        </div>
 
-      <AnalyticsCharts
-        dailyData={dailyData}
-        severityData={severityData}
-        cameraData={cameraData}
-      />
+        <AnalyticsCharts
+          dailyData={dailyData}
+          severityData={severityData}
+          cameraData={cameraData}
+        />
+      </div>
     </div>
   );
 }
