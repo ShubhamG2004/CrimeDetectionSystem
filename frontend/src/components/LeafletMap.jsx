@@ -233,12 +233,20 @@ function IncidentMarkers({ incidents, showCircles }) {
                     <span>Threat Score: <strong>{item.threat_score || 'N/A'}/100</strong></span>
                   </div>
                   
-                  {item.timestamp && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-gray-500">🕒</span>
-                      <span>{new Date(item.timestamp).toLocaleString()}</span>
-                    </div>
-                  )}
+                  {(() => {
+                    const createdAt = item.createdAt?.toDate
+                      ? item.createdAt.toDate()
+                      : item.createdAt || item.timestamp;
+
+                    if (!createdAt) return null;
+
+                    return (
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-500">🕒</span>
+                        <span>{new Date(createdAt).toLocaleString()}</span>
+                      </div>
+                    );
+                  })()}
                   
                   {item.description && (
                     <div className="mt-2 p-2 bg-gray-50 rounded">

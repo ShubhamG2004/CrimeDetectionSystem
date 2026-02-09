@@ -49,7 +49,7 @@ export default function Analytics() {
   const processDaily = (incidents) => {
     const map = {};
     incidents.forEach((i) => {
-      const date = formatDate(i.timestamp);
+      const date = formatDate(i.createdAt || i.timestamp);
       map[date] = (map[date] || 0) + 1;
     });
 

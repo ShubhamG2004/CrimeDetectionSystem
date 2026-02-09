@@ -1,5 +1,5 @@
 const cloudinary = require("../config/cloudinary");
-const { db } = require("../config/firebase");
+const { admin, db } = require("../config/firebase");
 
 /**
  * Create & save crime incident
@@ -97,8 +97,8 @@ exports.createIncident = async (req, res) => {
       imageUrl: uploadResponse.secure_url,
 
       // ⏱ Time
-      timestamp: new Date(),
-      analysis_timestamp: new Date(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 
     // ---------------- 4️⃣ SAVE TO FIRESTORE ----------------

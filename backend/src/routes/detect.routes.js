@@ -3,7 +3,7 @@ const multer = require("multer");
 const axios = require("axios");
 const FormData = require("form-data");
 const cloudinary = require("../config/cloudinary");
-const { db } = require("../config/firebase");
+const { admin, db } = require("../config/firebase");
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -141,7 +141,8 @@ router.post("/image", upload.single("image"), async (req, res) => {
       imageUrl: uploadRes.secure_url,
 
       source: "ai-image-detection",
-      createdAt: new Date(),
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       aiTimestamp: timestamp,
     };
 

@@ -105,7 +105,7 @@ useEffect(() => {
         return {
           id: doc.id,
           ...data,
-          timestamp: data.createdAt?.toDate() || null,
+          createdAt: data.createdAt?.toDate() || null,
         };
       });
 
@@ -253,7 +253,7 @@ useEffect(() => {
       Confidence: `${Math.round((inc.confidence || 0) * 100)}%`,
       "People Detected": inc.persons_detected || 0,
       "Threat Score": inc.threat_score || 0,
-      Timestamp: inc.timestamp?.toLocaleString() || "Unknown"
+      Timestamp: inc.createdAt?.toLocaleString() || "Unknown"
     }));
 
     const csv = [
@@ -545,7 +545,7 @@ useEffect(() => {
                               <div className="flex items-center gap-3 mt-2">
                                 <span className="flex items-center gap-1.5 text-sm text-gray-600">
                                   <Clock className="w-4 h-4" />
-                                  {formatDate(incident.timestamp)}
+                                  {formatDate(incident.createdAt)}
                                 </span>
                                 <span className="flex items-center gap-1.5 text-sm text-gray-600">
                                   <MapPin className="w-4 h-4" />
@@ -633,7 +633,7 @@ useEffect(() => {
             Showing {filteredIncidents.length} of {incidents.length} total incidents
             {incidents.length > 0 && (
               <span className="ml-4">
-                Last updated {formatDate(new Date(Math.max(...incidents.map(i => i.timestamp?.getTime() || 0))))}
+                Last updated {formatDate(new Date(Math.max(...incidents.map(i => i.createdAt?.getTime() || 0))))}
               </span>
             )}
           </div>
