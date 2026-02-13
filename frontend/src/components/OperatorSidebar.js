@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, Image, Map, Shield } from "lucide-react";
+import { AlertTriangle, Image, Map, Shield, CheckCircle } from "lucide-react";
 import LogoutButton from "./LogoutButton";
 
 export default function OperatorSidebar() {
@@ -89,6 +89,15 @@ export default function OperatorSidebar() {
           >
             <Map className={iconClass(isActive("/dashboard/operator/map"))} />
             <span className={labelClass(isActive("/dashboard/operator/map"))}>Incident Map</span>
+          </a>
+
+          <a
+            href="/dashboard/operator/incidents"
+            onClick={handleClose}
+            className={navItemClass(isActive("/dashboard/operator/incidents"))}
+          >
+            <CheckCircle className={iconClass(isActive("/dashboard/operator/incidents"))} />
+            <span className={labelClass(isActive("/dashboard/operator/incidents"))}>Manage Incidents</span>
           </a>
 
           <div className="pt-4 mt-4 border-t border-slate-100">
