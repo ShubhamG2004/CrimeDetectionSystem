@@ -289,10 +289,10 @@ export default function OperatorMapPage() {
                       <AlertCircle className="w-12 h-12 text-red-600 relative z-10" />
                     </div>
                   </div>
-                  <h3 className="text-2xl font-bold text-slate-900 mb-3">
+                  <h3 className="text-3xl font-bold text-slate-900 mb-3">
                     Map Unavailable
                   </h3>
-                  <p className="text-slate-600 mb-8 text-lg">
+                  <p className="text-slate-600 mb-8 text-xl">
                     {error}
                   </p>
                   <div className="flex gap-4">
@@ -340,8 +340,8 @@ export default function OperatorMapPage() {
                   <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-white shadow"></div>
                 </div>
                 <div>
-                  <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Live Incident Map</h1>
-                  <div className="flex items-center gap-2 text-sm">
+                  <h1 className="text-3xl font-bold text-slate-900 tracking-tight">Live Incident Map</h1>
+                  <div className="flex items-center gap-2 text-base">
                     <div className="flex items-center gap-1.5">
                       <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                       <span className="text-slate-600">Real-time monitoring</span>
@@ -362,8 +362,8 @@ export default function OperatorMapPage() {
             <div className="mb-8">
               <div className="flex items-center justify-between mb-6">
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900">Live Operations Dashboard</h2>
-                  <p className="text-slate-600 mt-1">
+                  <h2 className="text-2xl font-bold text-slate-900">Live Operations Dashboard</h2>
+                  <p className="text-slate-600 mt-1 text-lg">
                     Real-time threat monitoring across {cameraCount} surveillance points
                   </p>
                 </div>
@@ -371,7 +371,7 @@ export default function OperatorMapPage() {
                   {mounted && lastUpdate && (
                     <div className="flex items-center gap-2 px-4 py-2 bg-white rounded-lg border border-slate-200 shadow-sm">
                       <Clock className="w-4 h-4 text-slate-500" />
-                      <span className="text-sm font-medium text-slate-700">
+                      <span className="text-base font-medium text-slate-700">
                         Updated: {lastUpdate.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
                       </span>
                     </div>
@@ -392,13 +392,13 @@ export default function OperatorMapPage() {
                 <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-lg shadow-blue-500/5 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 group hover:-translate-y-1">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-sm font-medium text-slate-500 mb-1.5">Active Incidents</p>
+                      <p className="text-base font-medium text-slate-500 mb-1.5">Active Incidents</p>
                       <div className="flex items-baseline gap-3">
-                        <p className="text-4xl font-bold text-slate-900">{incidents.length}</p>
+                        <p className="text-5xl font-bold text-slate-900">{incidents.length}</p>
                         {incidents.length > 0 && (
                           <div className="flex items-center gap-1 px-2.5 py-1 bg-red-50 rounded-full">
                             <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                            <span className="text-xs font-semibold text-red-700">LIVE</span>
+                            <span className="text-sm font-semibold text-red-700">LIVE</span>
                           </div>
                         )}
                       </div>
@@ -408,7 +408,7 @@ export default function OperatorMapPage() {
                     </div>
                   </div>
                   <div className="mt-6 pt-6 border-t border-slate-100">
-                    <div className="flex justify-between text-sm">
+                    <div className="flex justify-between text-base">
                       <div className="flex items-center gap-2">
                         <div className="w-3 h-3 bg-red-500 rounded-full"></div>
                         <span className="text-slate-700 font-medium">Critical</span>
@@ -427,15 +427,15 @@ export default function OperatorMapPage() {
                 <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-lg shadow-blue-500/5 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 group hover:-translate-y-1">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-sm font-medium text-slate-500 mb-1.5">Cameras Assigned</p>
-                      <p className="text-4xl font-bold text-slate-900">{cameraCount}</p>
+                      <p className="text-base font-medium text-slate-500 mb-1.5">Cameras Assigned</p>
+                      <p className="text-5xl font-bold text-slate-900">{cameraCount}</p>
                     </div>
                     <div className="w-14 h-14 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                       <Camera className="w-7 h-7 text-blue-600" />
                     </div>
                   </div>
                   <div className="mt-6 pt-6 border-t border-slate-100">
-                    <div className="flex items-center gap-2 text-sm">
+                    <div className="flex items-center gap-2 text-base">
                       <div className={`w-2 h-2 rounded-full ${cameraCount > 0 ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`}></div>
                       <span className="text-slate-700">
                         {cameraCount > 0 ? 'All systems operational' : 'No cameras assigned'}
@@ -448,13 +448,13 @@ export default function OperatorMapPage() {
                 <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-lg shadow-blue-500/5 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 group hover:-translate-y-1">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-sm font-medium text-slate-500 mb-1.5">System Status</p>
+                      <p className="text-base font-medium text-slate-500 mb-1.5">System Status</p>
                       <div className="flex items-center gap-3">
                         <div className="relative">
                           <div className="w-4 h-4 bg-green-500 rounded-full"></div>
                           <div className="absolute inset-0 bg-green-500 rounded-full animate-ping opacity-75"></div>
                         </div>
-                        <p className="text-2xl font-bold text-green-700">ACTIVE</p>
+                        <p className="text-3xl font-bold text-green-700">ACTIVE</p>
                       </div>
                     </div>
                     <div className="w-14 h-14 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
@@ -462,7 +462,7 @@ export default function OperatorMapPage() {
                     </div>
                   </div>
                   <div className="mt-6 pt-6 border-t border-slate-100">
-                    <div className="flex items-center gap-2 text-sm">
+                    <div className="flex items-center gap-2 text-base">
                       <Activity className="w-4 h-4 text-slate-500" />
                       <span className="text-slate-700">Uptime: 99.9%</span>
                     </div>
@@ -473,15 +473,15 @@ export default function OperatorMapPage() {
                 <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-lg shadow-blue-500/5 hover:shadow-xl hover:shadow-blue-500/10 transition-all duration-300 group hover:-translate-y-1">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="text-sm font-medium text-slate-500 mb-1.5">Avg Response</p>
-                      <p className="text-4xl font-bold text-slate-900">2.4s</p>
+                      <p className="text-base font-medium text-slate-500 mb-1.5">Avg Response</p>
+                      <p className="text-5xl font-bold text-slate-900">2.4s</p>
                     </div>
                     <div className="w-14 h-14 bg-gradient-to-br from-purple-50 to-violet-50 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
                       <TrendingUp className="w-7 h-7 text-purple-600" />
                     </div>
                   </div>
                   <div className="mt-6 pt-6 border-t border-slate-100">
-                    <div className="flex items-center gap-2 text-sm">
+                    <div className="flex items-center gap-2 text-base">
                       <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                       <span className="text-slate-700">Within optimal range</span>
                     </div>
@@ -495,10 +495,10 @@ export default function OperatorMapPage() {
               <div className="px-6 py-5 border-b border-slate-200 bg-gradient-to-r from-slate-50 to-white">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                   <div>
-                    <h3 className="text-lg font-bold text-slate-900">Severity Trend (Last 24 Hours)</h3>
-                    <p className="text-sm text-slate-600">Older data is faded, last 3 hours are highlighted.</p>
+                    <h3 className="text-xl font-bold text-slate-900">Severity Trend (Last 24 Hours)</h3>
+                    <p className="text-base text-slate-600">Older data is faded, last 3 hours are highlighted.</p>
                   </div>
-                  <div className="flex items-center gap-4 text-sm">
+                  <div className="flex items-center gap-4 text-base">
                     <div className="flex items-center gap-2">
                       <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
                       <span className="text-slate-700 font-medium">Critical</span>
@@ -519,8 +519,8 @@ export default function OperatorMapPage() {
                   <ResponsiveContainer width="100%" height="100%">
                     <LineChart data={trendData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                      <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#64748b" }} />
-                      <YAxis allowDecimals={false} tick={{ fontSize: 12, fill: "#64748b" }} />
+                      <XAxis dataKey="label" tick={{ fontSize: 14, fill: "#64748b" }} />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 14, fill: "#64748b" }} />
                       <Tooltip />
                       <Line
                         type="monotone"
@@ -586,15 +586,15 @@ export default function OperatorMapPage() {
                       <Layers className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <h2 className="text-xl font-bold text-slate-900">Incident Map Overview</h2>
-                      <p className="text-slate-600">Interactive geospatial visualization of all active threats</p>
+                      <h2 className="text-2xl font-bold text-slate-900">Incident Map Overview</h2>
+                      <p className="text-slate-600 text-lg">Interactive geospatial visualization of all active threats</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
                     {loading && (
                       <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-lg">
                         <RefreshCw className="w-4 h-4 text-blue-600 animate-spin" />
-                        <span className="text-sm font-medium text-blue-700">Syncing data...</span>
+                        <span className="text-base font-medium text-blue-700">Syncing data...</span>
                       </div>
                     )}
                     <div className="px-5 py-2.5 bg-gradient-to-r from-red-600 to-orange-600 rounded-xl text-white font-bold flex items-center gap-2 shadow-lg shadow-red-500/25">
@@ -615,8 +615,8 @@ export default function OperatorMapPage() {
                         <MapPin className="w-12 h-12 text-blue-600" />
                       </div>
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-900 mb-3">Loading Live Map</h3>
-                    <p className="text-slate-600 max-w-md text-center">
+                    <h3 className="text-3xl font-bold text-slate-900 mb-3">Loading Live Map</h3>
+                    <p className="text-slate-600 max-w-md text-center text-lg">
                       Initializing real-time surveillance data from {cameraCount} camera{cameraCount !== 1 ? 's' : ''}...
                     </p>
                     <div className="mt-8 flex items-center gap-3">
@@ -633,20 +633,20 @@ export default function OperatorMapPage() {
                         <Shield className="w-16 h-16 text-emerald-600 relative z-10" />
                       </div>
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-900 mb-3">All Systems Clear</h3>
-                    <p className="text-slate-600 max-w-md text-center mb-8">
+                    <h3 className="text-3xl font-bold text-slate-900 mb-3">All Systems Clear</h3>
+                    <p className="text-slate-600 max-w-md text-center mb-8 text-lg">
                       No active threats detected across {cameraCount} surveillance camera{cameraCount !== 1 ? 's' : ''}. 
                       The monitored area is secure and all systems are functioning normally.
                     </p>
                     <div className="flex items-center gap-6">
                       <div className="flex items-center gap-2">
                         <CheckCircle className="w-5 h-5 text-emerald-600" />
-                        <span className="text-sm font-medium text-emerald-700">Secure Perimeter</span>
+                        <span className="text-base font-medium text-emerald-700">Secure Perimeter</span>
                       </div>
                       <div className="w-px h-6 bg-slate-200"></div>
                       <div className="flex items-center gap-2">
                         <Eye className="w-5 h-5 text-blue-600" />
-                        <span className="text-sm font-medium text-blue-700">Active Monitoring</span>
+                        <span className="text-base font-medium text-blue-700">Active Monitoring</span>
                       </div>
                     </div>
                   </div>
@@ -665,25 +665,25 @@ export default function OperatorMapPage() {
                       <div className="flex items-center gap-4">
                         <div className="flex items-center gap-2">
                           <div className="w-4 h-4 bg-red-500 rounded-full"></div>
-                          <span className="text-sm font-semibold text-slate-900">
+                          <span className="text-base font-semibold text-slate-900">
                             Critical ({stats.critical})
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="w-4 h-4 bg-orange-500 rounded-full"></div>
-                          <span className="text-sm font-semibold text-slate-900">
+                          <span className="text-base font-semibold text-slate-900">
                             High ({stats.high})
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="w-4 h-4 bg-amber-500 rounded-full"></div>
-                          <span className="text-sm font-semibold text-slate-900">
+                          <span className="text-base font-semibold text-slate-900">
                             Medium ({stats.medium})
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className="w-4 h-4 bg-blue-500 rounded-full"></div>
-                          <span className="text-sm font-semibold text-slate-900">
+                          <span className="text-base font-semibold text-slate-900">
                             Low ({stats.low})
                           </span>
                         </div>
@@ -691,10 +691,10 @@ export default function OperatorMapPage() {
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="text-right">
-                        <p className="text-sm font-medium text-slate-700">
+                        <p className="text-base font-medium text-slate-700">
                           {incidents.length} active incident{incidents.length !== 1 ? 's' : ''}
                         </p>
-                        <p className="text-xs text-slate-500">
+                        <p className="text-sm text-slate-500">
                           Last updated: {lastUpdate?.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                         </p>
                       </div>
@@ -710,17 +710,17 @@ export default function OperatorMapPage() {
             {/* Bottom Status Bar */}
             <div className="mt-6 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 text-sm text-slate-600">
+                <div className="flex items-center gap-2 text-base text-slate-600">
                   <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
                   <span>Connection stable</span>
                 </div>
                 <span className="text-slate-400">•</span>
-                <div className="flex items-center gap-2 text-sm text-slate-600">
+                <div className="flex items-center gap-2 text-base text-slate-600">
                   <Eye className="w-4 h-4" />
                   <span>Live feed active</span>
                 </div>
               </div>
-              <div className="text-sm text-slate-500">
+              <div className="text-base text-slate-500">
                 <span className="font-medium">Operator ID:</span> {auth.currentUser?.uid?.slice(-8)} • 
                 <span className="ml-2">Auto-refresh every 30s</span>
               </div>
