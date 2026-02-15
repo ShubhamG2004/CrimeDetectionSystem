@@ -51,7 +51,7 @@ class PoseCrimeDetector:
         
         # ---- FINAL CLASSIFICATION ----
         crime_type, threat_level = self._classify(signals, activities, persons)
-        crime_detected = threat_score >= 50  # Slightly higher threshold for better accuracy
+        crime_detected = threat_score >= 40
         
         return {
             "persons_detected": persons,
@@ -165,6 +165,11 @@ class PoseCrimeDetector:
            right_wrist[1] < right_shoulder[1] - torso_height * 0.2:
             acts.append("HANDS_UP")
         
+        # Victim vulnerability detection
+        if self._is_crouching(k) or body_verticality < 0.4:
+            s.append("VULNERABLE_POSITION")
+            acts.append("DEFENSIVE_POSTURE")
+        
         return s, acts
     
     # -------------------------------------------------
@@ -191,6 +196,11 @@ class PoseCrimeDetector:
                     s.append("CLOSE_CONTACT")
                     acts.append("PHYSICAL_PROXIMITY")
                 
+                # Body collision detection (very close contact)
+                if normalized_distance < 0.15:
+                    s.append("BODY_COLLISION")
+                    acts.append("PHYSICAL_CONTACT")
+                
                 # Assault detection
                 for wrist_idx in [9, 10]:  # Left and right wrists
                     for head_idx in [0, 1, 2, 3, 4]:  # Head keypoints
@@ -213,6 +223,23 @@ class PoseCrimeDetector:
                 if n >= 3:
                     if self._is_circle_formation([kps_all[i], kps_all[j]], kps_all):
                         acts.append("CROWD_FORMATION")
+                
+                # Overpower detection (aggressor standing over crouched victim)
+                vertical_diff = abs(hip_i[1] - hip_j[1])
+                
+                if vertical_diff > 30:
+                    s.append("POWER_IMBALANCE")
+                    acts.append("DOMINANT_POSITION")
+                
+                # Strong assault detection rule
+                if (
+                    "CLOSE_CONTACT" in s and
+                    ("AGGRESSIVE_GESTURE" in acts or
+                     "KICKING_MOTION" in acts or
+                     "BODY_COLLISION" in s)
+                ):
+                    s.append("DIRECT_ASSAULT")
+                    acts.append("PHYSICAL_ASSAULT")
         
         return s, acts
     
@@ -379,7 +406,11 @@ class PoseCrimeDetector:
             "ASSAULT_HEAD": 30, "GRABBING": 20,
             "PUNCH_LEFT": 15, "PUNCH_RIGHT": 15,
             "KICK_LEFT": 15, "KICK_RIGHT": 15,
-            "FALLEN": 10, "CLOSE_CONTACT": 10
+            "FALLEN": 10, "CLOSE_CONTACT": 10,
+            "DIRECT_ASSAULT": 35,
+            "POWER_IMBALANCE": 20,
+            "VULNERABLE_POSITION": 25,
+            "BODY_COLLISION": 25
         }
         
         # Activity weights
@@ -387,7 +418,9 @@ class PoseCrimeDetector:
             "PHYSICAL_ASSAULT": 20, "CHOKING_MOTION": 25,
             "THREATENING_GESTURE": 15, "RESTRAINING_MOTION": 20,
             "AGGRESSIVE_GESTURE": 10, "KICKING_MOTION": 10,
-            "FOLLOWING_CHASING": 15, "CROWD_FORMATION": 10
+            "FOLLOWING_CHASING": 15, "CROWD_FORMATION": 10,
+            "DEFENSIVE_POSTURE": 20,
+            "DOMINANT_POSITION": 20
         }
         
         # Add signal scores
@@ -421,6 +454,18 @@ class PoseCrimeDetector:
         has_punch = any(sig.startswith("PUNCH") for sig in s)
         has_kick = any(sig.startswith("KICK") for sig in s)
 
+        # Critical threat scenarios - NEW ASSAULT DETECTION
+        if (
+            "DIRECT_ASSAULT" in s and
+            "VULNERABLE_POSITION" in s
+        ):
+            return "Woman Assault / Physical Violence", "CRITICAL"
+
+        if (
+            "DIRECT_ASSAULT" in s
+        ):
+            return "Physical Assault", "HIGH"
+        
         # High threat scenarios
         if "GRAB_NECK_LEFT" in s or "GRAB_NECK_RIGHT" in s:
             return "Choking / Attempted Murder", "CRITICAL"
