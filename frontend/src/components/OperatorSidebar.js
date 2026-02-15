@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AlertTriangle, Image, Map, Shield, CheckCircle } from "lucide-react";
@@ -64,41 +65,41 @@ export default function OperatorSidebar() {
         </div>
 
         <nav className="space-y-2 flex-1">
-          <a
+          <Link
             href="/dashboard/operator"
             onClick={handleClose}
             className={navItemClass(isActive("/dashboard/operator"))}
           >
             <AlertTriangle className={iconClass(isActive("/dashboard/operator"))} />
             <span className={labelClass(isActive("/dashboard/operator"))}>Live Incidents</span>
-          </a>
+          </Link>
 
-          <a
+          <Link
             href="/detect-image"
             onClick={handleClose}
             className={navItemClass(isActive("/detect-image"))}
           >
             <Image className={iconClass(isActive("/detect-image"))} />
             <span className={labelClass(isActive("/detect-image"))}>Image Detection</span>
-          </a>
+          </Link>
 
-          <a
+          <Link
             href="/dashboard/operator/map"
             onClick={handleClose}
             className={navItemClass(isActive("/dashboard/operator/map"))}
           >
             <Map className={iconClass(isActive("/dashboard/operator/map"))} />
             <span className={labelClass(isActive("/dashboard/operator/map"))}>Incident Map</span>
-          </a>
+          </Link>
 
-          <a
+          <Link
             href="/dashboard/operator/incidents"
             onClick={handleClose}
             className={navItemClass(isActive("/dashboard/operator/incidents"))}
           >
             <CheckCircle className={iconClass(isActive("/dashboard/operator/incidents"))} />
             <span className={labelClass(isActive("/dashboard/operator/incidents"))}>Manage Incidents</span>
-          </a>
+          </Link>
 
           <div className="pt-4 mt-4 border-t border-slate-100">
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 border border-slate-200">

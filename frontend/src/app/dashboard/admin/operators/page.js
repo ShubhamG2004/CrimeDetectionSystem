@@ -29,6 +29,7 @@ export default function ManageOperators() {
 
   const [search, setSearch] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const emptyForm = {
     email: "",
@@ -37,6 +38,11 @@ export default function ManageOperators() {
   };
 
   const [form, setForm] = useState(emptyForm);
+
+  /* ================= MOUNTED STATE ================= */
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   /* ================= AUTH GUARD ================= */
   useEffect(() => {
@@ -284,10 +290,14 @@ export default function ManageOperators() {
                     </td>
 
                     <td className="p-4 text-center text-gray-600">
-                      {op.createdAt
+                      {mounted && op.createdAt
                         ? new Date(
                             op.createdAt.seconds * 1000
-                          ).toLocaleDateString()
+                          ).toLocaleDateString([], {
+                            year: "numeric",
+                            month: "short",
+                            day: "numeric"
+                          })
                         : "—"}
                     </td>
 

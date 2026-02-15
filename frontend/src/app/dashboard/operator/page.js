@@ -50,6 +50,7 @@ export default function OperatorDashboard() {
     medium: 0,
     low: 0,
   });
+  const [mounted, setMounted] = useState(false);
 
   /* ---------- AUTH GUARD ---------- */
   useEffect(() => {
@@ -177,7 +178,11 @@ useEffect(() => {
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffHours < 24) return `${diffHours}h ago`;
     if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+    return mounted ? date.toLocaleDateString([], { 
+      year: "numeric", 
+      month: "short", 
+      day: "numeric" 
+    }) : "";
   };
 
   const getCrimeTypeDisplay = (type) =>
@@ -253,7 +258,13 @@ useEffect(() => {
       Confidence: `${Math.round((inc.confidence || 0) * 100)}%`,
       "People Detected": inc.persons_detected || 0,
       "Threat Score": inc.threat_score || 0,
-      Timestamp: inc.createdAt?.toLocaleString() || "Unknown"
+      Timestamp: mounted ? (inc.createdAt?.toLocaleString([], {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit"
+      }) || "Unknown") : "Unknown"
     }));
 
     const csv = [
@@ -265,7 +276,7 @@ useEffect(() => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `incidents_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = mounted ? `incidents_${new Date().toISOString().split('T')[0]}.csv` : 'incidents.csv';
     a.click();
   };
 

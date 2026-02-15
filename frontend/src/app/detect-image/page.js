@@ -17,6 +17,14 @@ export default function ImageDetectionPage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
+  const [mounted, setMounted] = useState(false);
+
+  /* ======================================================
+     🔄 MOUNTED STATE - PREVENT HYDRATION ISSUES
+     ====================================================== */
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   /* ======================================================
      🎥 FETCH CAMERAS AFTER AUTH IS READY
@@ -519,7 +527,26 @@ export default function ImageDetectionPage() {
                   </div>
 
                   <div className="text-sm text-gray-500">
-                    <p>Timestamp: {result.timestamp ? new Date(result.timestamp).toLocaleString() : new Date().toLocaleString()}</p>
+                    {mounted && (
+                      <p>
+                        Timestamp: {result.timestamp 
+                          ? new Date(result.timestamp).toLocaleString([], {
+                              year: "numeric",
+                              month: "short", 
+                              day: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            })
+                          : new Date().toLocaleString([], {
+                              year: "numeric",
+                              month: "short",
+                              day: "numeric", 
+                              hour: "2-digit",
+                              minute: "2-digit"
+                            })
+                        }
+                      </p>
+                    )}
                     {selectedCamera && (
                       <p>Camera: {selectedCamera.name}</p>
                     )}
