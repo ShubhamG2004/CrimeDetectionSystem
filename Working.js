@@ -13,7 +13,7 @@ class PoseCrimeDetector:
         
     def analyze(self, image):
         # Process with higher resolution for better keypoint accuracy
-        results = self.model(image, conf=0.3, iou=0.45, verbose=False)[0]  # Lowered confidence threshold
+        results = self.model(image, conf=0.5, iou=0.45, verbose=False)[0]
         
         if results.keypoints is None or len(results.keypoints) == 0:
             return self._empty_result()
@@ -72,10 +72,10 @@ class PoseCrimeDetector:
         acts = []
         
         # Validate keypoints confidence
-        min_conf = 0.3  # Lowered threshold
+        min_conf = 0.4
         if conf is not None:
             valid_points = [i for i, c in enumerate(conf) if c > min_conf]
-            if len(valid_points) < 8:  # Reduced requirement
+            if len(valid_points) < 10:  # Not enough reliable keypoints
                 return s, acts
         
         # Keypoint indices (COCO format)
@@ -93,12 +93,12 @@ class PoseCrimeDetector:
         torso_height = abs(nose[1] - (left_hip[1] + right_hip[1]) / 2)
         shoulder_width = abs(left_shoulder[0] - right_shoulder[0])
         
-        if torso_height < 5 or shoulder_width < 5:  # Lowered threshold
+        if torso_height < 10 or shoulder_width < 10:  # Invalid detection
             return s, acts
         
         # ---- AGGRESSIVE GESTURES ----
         
-        # Punch detection (improved with lower thresholds)
+        # Punch detection (improved)
         left_arm_extended = self._is_arm_extended(
             left_shoulder, left_elbow, left_wrist, torso_height
         )
@@ -106,15 +106,15 @@ class PoseCrimeDetector:
             right_shoulder, right_elbow, right_wrist, torso_height
         )
         
-        # Check if wrist is above elbow (punching motion) - more sensitive
-        if left_arm_extended and left_wrist[1] < left_elbow[1] - torso_height * 0.05:
+        # Check if wrist is above elbow (punching motion)
+        if left_arm_extended and left_wrist[1] < left_elbow[1] - torso_height * 0.1:
             s.append("PUNCH_LEFT")
             acts.append("AGGRESSIVE_GESTURE")
-        if right_arm_extended and right_wrist[1] < right_elbow[1] - torso_height * 0.05:
+        if right_arm_extended and right_wrist[1] < right_elbow[1] - torso_height * 0.1:
             s.append("PUNCH_RIGHT")
             acts.append("AGGRESSIVE_GESTURE")
         
-        # Kick detection (improved with lower thresholds)
+        # Kick detection (improved)
         left_leg_raised = self._is_leg_raised(
             left_hip, left_knee, left_ankle, torso_height
         )
@@ -129,26 +129,26 @@ class PoseCrimeDetector:
             s.append("KICK_RIGHT")
             acts.append("KICKING_MOTION")
         
-        # Weapon threat (straight arm pointing) - more sensitive
-        if left_arm_extended and abs(left_wrist[0] - left_shoulder[0]) > shoulder_width * 1.2:
+        # Weapon threat (straight arm pointing)
+        if left_arm_extended and abs(left_wrist[0] - left_shoulder[0]) > shoulder_width * 1.5:
             s.append("WEAPON_THREAT_LEFT")
             acts.append("THREATENING_GESTURE")
-        if right_arm_extended and abs(right_wrist[0] - right_shoulder[0]) > shoulder_width * 1.2:
+        if right_arm_extended and abs(right_wrist[0] - right_shoulder[0]) > shoulder_width * 1.5:
             s.append("WEAPON_THREAT_RIGHT")
             acts.append("THREATENING_GESTURE")
         
-        # Choking/grabbing neck (improved with larger radius)
-        neck_y = nose[1] + torso_height * 0.25  # Adjusted neck position
-        if self._distance(left_wrist, [nose[0], neck_y]) < torso_height * 0.4:
+        # Choking/grabbing neck (improved)
+        neck_y = nose[1] + torso_height * 0.2  # Approximate neck position
+        if self._distance(left_wrist, [nose[0], neck_y]) < torso_height * 0.3:
             s.append("GRAB_NECK_LEFT")
             acts.append("CHOKING_MOTION")
-        if self._distance(right_wrist, [nose[0], neck_y]) < torso_height * 0.4:
+        if self._distance(right_wrist, [nose[0], neck_y]) < torso_height * 0.3:
             s.append("GRAB_NECK_RIGHT")
             acts.append("CHOKING_MOTION")
         
         # Fallen person (improved)
         body_verticality = self._calculate_body_verticality(k)
-        if body_verticality < 0.4:  # Slightly higher threshold
+        if body_verticality < 0.3:  # Very horizontal
             s.append("FALLEN")
             acts.append("PRONE_POSITION")
         
@@ -161,12 +161,12 @@ class PoseCrimeDetector:
             acts.append("CROUCHING")
         
         # Hands up (surrender or threat)
-        if left_wrist[1] < left_shoulder[1] - torso_height * 0.15 and \
-           right_wrist[1] < right_shoulder[1] - torso_height * 0.15:
+        if left_wrist[1] < left_shoulder[1] - torso_height * 0.2 and \
+           right_wrist[1] < right_shoulder[1] - torso_height * 0.2:
             acts.append("HANDS_UP")
         
         # Victim vulnerability detection
-        if self._is_crouching(k) or body_verticality < 0.5:
+        if self._is_crouching(k) or body_verticality < 0.4:
             s.append("VULNERABLE_POSITION")
             acts.append("DEFENSIVE_POSTURE")
         
@@ -189,39 +189,28 @@ class PoseCrimeDetector:
                 distance = self._distance(hip_i, hip_j)
                 frame_diagonal = self._calculate_frame_diagonal(boxes[i], boxes[j])
                 
-                normalized_distance = distance / frame_diagonal if frame_diagonal > 0 else 1.0
+                normalized_distance = distance / frame_diagonal
                 
-                # Close contact (based on body proportions) - increased thresholds
-                if normalized_distance < 0.4:  # More sensitive
+                # Close contact (based on body proportions)
+                if normalized_distance < 0.3:
                     s.append("CLOSE_CONTACT")
                     acts.append("PHYSICAL_PROXIMITY")
                 
                 # Body collision detection (very close contact)
-                if normalized_distance < 0.2:  # More sensitive
+                if normalized_distance < 0.15:
                     s.append("BODY_COLLISION")
                     acts.append("PHYSICAL_CONTACT")
                 
-                # Assault detection - IMPROVED
+                # Assault detection
                 for wrist_idx in [9, 10]:  # Left and right wrists
                     for head_idx in [0, 1, 2, 3, 4]:  # Head keypoints
-                        if np.any(np.isnan(kps_all[i][wrist_idx])) or np.any(np.isnan(kps_all[j][head_idx])):
-                            continue
                         dist = self._distance(kps_all[i][wrist_idx], kps_all[j][head_idx])
-                        if dist < 50:  # Increased threshold for better detection
+                        if dist < 30:  # Wrist near head
                             s.append("ASSAULT_HEAD")
                             acts.append("PHYSICAL_ASSAULT")
-                            
-                # Also check wrists to torso/body contact
-                for wrist_idx in [9, 10]:
-                    for body_idx in [5, 6, 11, 12]:  # Shoulders and hips
-                        if np.any(np.isnan(kps_all[i][wrist_idx])) or np.any(np.isnan(kps_all[j][body_idx])):
-                            continue
-                        dist = self._distance(kps_all[i][wrist_idx], kps_all[j][body_idx])
-                        if dist < 40:
-                            s.append("BODY_CONTACT")
-                            acts.append("PHYSICAL_ASSAULT")
+                            break
                 
-                # Grabbing detection - IMPROVED
+                # Grabbing detection
                 if self._is_grabbing(kps_all[i], kps_all[j]):
                     s.append("GRABBING")
                     acts.append("RESTRAINING_MOTION")
@@ -236,19 +225,18 @@ class PoseCrimeDetector:
                         acts.append("CROWD_FORMATION")
                 
                 # Overpower detection (aggressor standing over crouched victim)
-                if hip_i is not None and hip_j is not None:
-                    vertical_diff = abs(hip_i[1] - hip_j[1])
-                    
-                    if vertical_diff > 20:  # Lowered threshold
-                        s.append("POWER_IMBALANCE")
-                        acts.append("DOMINANT_POSITION")
+                vertical_diff = abs(hip_i[1] - hip_j[1])
                 
-                # Strong assault detection rule - IMPROVED
-                if "CLOSE_CONTACT" in s and (
-                    "AGGRESSIVE_GESTURE" in acts or
-                    "KICKING_MOTION" in acts or
-                    "BODY_COLLISION" in s or
-                    "ASSAULT_HEAD" in s
+                if vertical_diff > 30:
+                    s.append("POWER_IMBALANCE")
+                    acts.append("DOMINANT_POSITION")
+                
+                # Strong assault detection rule
+                if (
+                    "CLOSE_CONTACT" in s and
+                    ("AGGRESSIVE_GESTURE" in acts or
+                     "KICKING_MOTION" in acts or
+                     "BODY_COLLISION" in s)
                 ):
                     s.append("DIRECT_ASSAULT")
                     acts.append("PHYSICAL_ASSAULT")
@@ -262,26 +250,26 @@ class PoseCrimeDetector:
         """Check if arm is relatively straight and extended"""
         # Calculate angles
         angle1 = self._angle_between(shoulder, elbow, wrist)
-        # Check if arm is relatively straight (angle close to 180 degrees) - wider range
-        arm_straight = abs(angle1 - 180) < 45  # More tolerant
+        # Check if arm is relatively straight (angle close to 180 degrees)
+        arm_straight = abs(angle1 - 180) < 30
         
         # Check extension length
         arm_length = self._distance(shoulder, wrist)
-        extended = arm_length > torso_height * 0.5  # Lower threshold
+        extended = arm_length > torso_height * 0.7
         
         return arm_straight and extended
     
     def _is_leg_raised(self, hip, knee, ankle, torso_height):
-        """Check if leg is raised for kicking - more sensitive"""
+        """Check if leg is raised for kicking"""
         # Check if knee is significantly higher than hip (front kick)
-        front_kick = knee[1] < hip[1] - torso_height * 0.05  # Lower threshold
+        front_kick = knee[1] < hip[1] - torso_height * 0.1
         
         # Check if ankle is significantly higher than knee (high kick)
-        high_kick = ankle[1] < knee[1] - torso_height * 0.05  # Lower threshold
+        high_kick = ankle[1] < knee[1] - torso_height * 0.1
         
-        # Check leg angle for side kick - wider range
+        # Check leg angle for side kick
         leg_angle = self._angle_between(hip, knee, ankle)
-        side_kick = 100 < leg_angle < 180  # Wider range
+        side_kick = 120 < leg_angle < 160
         
         return front_kick or high_kick or side_kick
     
@@ -313,19 +301,17 @@ class PoseCrimeDetector:
         left_leg_angle = self._angle_between(k[11], k[13], k[15])
         right_leg_angle = self._angle_between(k[12], k[14], k[16])
         
-        # Running typically has legs bent at acute angles - more tolerant
-        return (left_leg_angle < 140 or right_leg_angle < 140) and \
-               abs(k[13][1] - k[14][1]) > 15  # Lower threshold
+        # Running typically has legs bent at acute angles
+        return (left_leg_angle < 120 or right_leg_angle < 120) and \
+               abs(k[13][1] - k[14][1]) > 20  # Knees at different heights
     
     def _is_crouching(self, k):
         """Detect crouching/sneaking position"""
         # Check if knees are significantly lower than hips
-        knee_height_ratio = (k[13][1] + k[14][1]) / (2 * (k[11][1] + k[12][1]) / 2 + 1e-6)
-        return knee_height_ratio > 1.1  # Lower threshold
+        knee_height_ratio = (k[13][1] + k[14][1]) / (2 * (k[11][1] + k[12][1]) / 2)
+        return knee_height_ratio > 1.2  # Knees below hips
     
     def _get_hip_center(self, k):
-        if np.any(np.isnan(k[11])) or np.any(np.isnan(k[12])):
-            return None
         return [(k[11][0] + k[12][0])/2, (k[11][1] + k[12][1])/2]
     
     def _calculate_frame_diagonal(self, box1, box2):
@@ -336,13 +322,10 @@ class PoseCrimeDetector:
         return math.sqrt((max_x - min_x)**2 + (max_y - min_y)**2)
     
     def _is_grabbing(self, kps1, kps2):
-        """Check if one person is grabbing another - more sensitive"""
+        """Check if one person is grabbing another"""
         for wrist_idx in [9, 10]:  # Check both wrists
-            for body_idx in [5, 6, 11, 12, 13, 14]:  # Expanded to include knees
-                if (np.any(np.isnan(kps1[wrist_idx])) or 
-                    np.any(np.isnan(kps2[body_idx]))):
-                    continue
-                if self._distance(kps1[wrist_idx], kps2[body_idx]) < 35:  # Larger radius
+            for body_idx in [5, 6, 11, 12]:  # Shoulders and hips
+                if self._distance(kps1[wrist_idx], kps2[body_idx]) < 25:
                     return True
         return False
     
@@ -356,9 +339,6 @@ class PoseCrimeDetector:
         pos1 = self._get_hip_center(kps1)
         pos2 = self._get_hip_center(kps2)
         
-        if pos1 is None or pos2 is None:
-            return False
-        
         vec_to_target = [pos2[0] - pos1[0], pos2[1] - pos1[1]]
         vec_to_target_mag = math.sqrt(vec_to_target[0]**2 + vec_to_target[1]**2)
         
@@ -368,9 +348,9 @@ class PoseCrimeDetector:
         # Normalize
         vec_to_target = [vec_to_target[0]/vec_to_target_mag, vec_to_target[1]/vec_to_target_mag]
         
-        # Dot product indicates alignment - lower threshold
+        # Dot product indicates alignment
         dot = direction1[0]*vec_to_target[0] + direction1[1]*vec_to_target[1]
-        return dot > 0.5  # Lower threshold
+        return dot > 0.7  # Facing toward the other person
     
     def _get_facing_direction(self, kps):
         """Estimate which direction person is facing"""
@@ -391,23 +371,15 @@ class PoseCrimeDetector:
         if len(all_kps) < 3:
             return False
         
-        centers = []
-        for k in all_kps:
-            center = self._get_hip_center(k)
-            if center is not None:
-                centers.append(center)
-        
-        if len(centers) < 3:
-            return False
-        
+        centers = [self._get_hip_center(k) for k in all_kps]
         avg_center = np.mean(centers, axis=0)
         
         distances = [self._distance(c, avg_center) for c in centers]
         avg_distance = np.mean(distances)
         
-        # Check if distances are relatively uniform (circle-like) - more tolerant
+        # Check if distances are relatively uniform (circle-like)
         std_distance = np.std(distances)
-        return std_distance / (avg_distance + 1e-6) < 0.4  # More tolerant
+        return std_distance / avg_distance < 0.3
     
     def _update_history(self, signals):
         """Maintain a simple history of signals"""
@@ -427,29 +399,28 @@ class PoseCrimeDetector:
         """Improved threat scoring"""
         score = 0
         
-        # Signal weights - increased weights for assault-related signals
+        # Signal weights
         signal_weights = {
-            "GRAB_NECK_LEFT": 30, "GRAB_NECK_RIGHT": 30,
-            "WEAPON_THREAT_LEFT": 25, "WEAPON_THREAT_RIGHT": 25,
-            "ASSAULT_HEAD": 35, "GRABBING": 25,
-            "BODY_CONTACT": 20,  # New
-            "PUNCH_LEFT": 20, "PUNCH_RIGHT": 20,  # Increased
-            "KICK_LEFT": 20, "KICK_RIGHT": 20,  # Increased
-            "FALLEN": 15, "CLOSE_CONTACT": 15,  # Increased
-            "DIRECT_ASSAULT": 40,  # Increased
-            "POWER_IMBALANCE": 25,  # Increased
-            "VULNERABLE_POSITION": 30,  # Increased
-            "BODY_COLLISION": 30  # Increased
+            "GRAB_NECK_LEFT": 25, "GRAB_NECK_RIGHT": 25,
+            "WEAPON_THREAT_LEFT": 20, "WEAPON_THREAT_RIGHT": 20,
+            "ASSAULT_HEAD": 30, "GRABBING": 20,
+            "PUNCH_LEFT": 15, "PUNCH_RIGHT": 15,
+            "KICK_LEFT": 15, "KICK_RIGHT": 15,
+            "FALLEN": 10, "CLOSE_CONTACT": 10,
+            "DIRECT_ASSAULT": 35,
+            "POWER_IMBALANCE": 20,
+            "VULNERABLE_POSITION": 25,
+            "BODY_COLLISION": 25
         }
         
-        # Activity weights - increased weights
+        # Activity weights
         activity_weights = {
-            "PHYSICAL_ASSAULT": 25, "CHOKING_MOTION": 30,
-            "THREATENING_GESTURE": 20, "RESTRAINING_MOTION": 25,
-            "AGGRESSIVE_GESTURE": 15, "KICKING_MOTION": 15,
-            "FOLLOWING_CHASING": 20, "CROWD_FORMATION": 15,
-            "DEFENSIVE_POSTURE": 25,  # Increased
-            "DOMINANT_POSITION": 25  # Increased
+            "PHYSICAL_ASSAULT": 20, "CHOKING_MOTION": 25,
+            "THREATENING_GESTURE": 15, "RESTRAINING_MOTION": 20,
+            "AGGRESSIVE_GESTURE": 10, "KICKING_MOTION": 10,
+            "FOLLOWING_CHASING": 15, "CROWD_FORMATION": 10,
+            "DEFENSIVE_POSTURE": 20,
+            "DOMINANT_POSITION": 20
         }
         
         # Add signal scores
@@ -460,15 +431,15 @@ class PoseCrimeDetector:
         for activity in set(activities):
             score += activity_weights.get(activity, 5)
         
-        # Multiplier for multiple persons - increased
+        # Multiplier for multiple persons
         if persons >= 3:
-            score *= 1.5
-        elif persons == 2:
             score *= 1.3
+        elif persons == 2:
+            score *= 1.1
         
         # Sustained signals multiplier
         if len(self.frame_history) >= 3 and len(set.intersection(*self.frame_history)) > 0:
-            score *= 1.3
+            score *= 1.2
         
         return min(100, score)
     
@@ -479,19 +450,11 @@ class PoseCrimeDetector:
         s = set(signals)
         a = set(activities)
 
-        # Helper flags
+        # ---- NEW: helper flags (ONLY ADDITION) ----
         has_punch = any(sig.startswith("PUNCH") for sig in s)
         has_kick = any(sig.startswith("KICK") for sig in s)
-        has_assault_signal = any(sig in ["ASSAULT_HEAD", "BODY_CONTACT", "DIRECT_ASSAULT"] for sig in s)
-        has_physical_contact = any(sig in ["CLOSE_CONTACT", "BODY_COLLISION", "GRABBING"] for sig in s)
 
-        # CRITICAL: Woman Assault / Physical Violence detection for the image
-        if persons >= 2 and (has_assault_signal or has_punch or has_kick) and has_physical_contact:
-            if "VULNERABLE_POSITION" in s or "POWER_IMBALANCE" in s:
-                return "Woman Assault / Physical Violence", "CRITICAL"
-            return "Physical Assault", "HIGH"
-
-        # Critical threat scenarios
+        # Critical threat scenarios - NEW ASSAULT DETECTION
         if (
             "DIRECT_ASSAULT" in s and
             "VULNERABLE_POSITION" in s
@@ -520,8 +483,8 @@ class PoseCrimeDetector:
         if persons >= 3 and ("PHYSICAL_ASSAULT" in a or "CROWD_FORMATION" in a):
             return "Crowd Violence / Riot", "HIGH"
 
-        # Fight detection
-        if persons == 2 and (has_punch or has_kick or has_assault_signal):
+        # ---- FIXED FIGHT LOGIC (THIS WAS THE BUG) ----
+        if persons == 2 and (has_punch or has_kick):
             return "Fight / Physical Violence", "HIGH"
 
         # Medium threat scenarios
@@ -545,15 +508,10 @@ class PoseCrimeDetector:
     # UTILITY METHODS
     # -------------------------------------------------
     def _distance(self, a, b):
-        if a is None or b is None or np.any(np.isnan(a)) or np.any(np.isnan(b)):
-            return float('inf')
         return math.sqrt((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2)
     
     def _angle_between(self, p1, p2, p3):
         """Calculate angle at p2 formed by p1-p2-p3"""
-        if any(p is None or np.any(np.isnan(p)) for p in [p1, p2, p3]):
-            return 180
-        
         a = np.array(p1)
         b = np.array(p2)
         c = np.array(p3)
@@ -561,13 +519,7 @@ class PoseCrimeDetector:
         ba = a - b
         bc = c - b
         
-        norm_ba = np.linalg.norm(ba)
-        norm_bc = np.linalg.norm(bc)
-        
-        if norm_ba < 1e-6 or norm_bc < 1e-6:
-            return 180
-        
-        cosine_angle = np.dot(ba, bc) / (norm_ba * norm_bc)
+        cosine_angle = np.dot(ba, bc) / (np.linalg.norm(ba) * np.linalg.norm(bc))
         angle = np.degrees(np.arccos(np.clip(cosine_angle, -1.0, 1.0)))
         
         return angle
