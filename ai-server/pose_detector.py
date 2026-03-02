@@ -96,6 +96,11 @@ class PoseCrimeDetector:
         if torso_height < 5 or shoulder_width < 5:  # Lowered threshold
             return s, acts
         
+        # Calculate neck area for improved harassment/molestation detection
+        neck_pos = (nose[0], nose[1] + torso_height * 0.2)
+        chest_pos = ((left_shoulder[0] + right_shoulder[0]) / 2, (left_shoulder[1] + right_shoulder[1]) / 2)
+        lower_torso_pos = ((left_hip[0] + right_hip[0]) / 2, (left_hip[1] + right_hip[1]) / 2)
+        
         # ---- AGGRESSIVE GESTURES ----
         
         # Punch detection (improved with lower thresholds)
@@ -146,6 +151,49 @@ class PoseCrimeDetector:
             s.append("GRAB_NECK_RIGHT")
             acts.append("CHOKING_MOTION")
         
+        # ---- WOMEN-SPECIFIC CRIME DETECTION ----
+        
+        # Chest/breast touching (molestation/sexual harassment) - NEW
+        chest_y = chest_pos[1]
+        chest_x = chest_pos[0]
+        left_chest_dist = self._distance(left_wrist, [chest_x, chest_y])
+        right_chest_dist = self._distance(right_wrist, [chest_x, chest_y])
+        
+        if left_chest_dist < torso_height * 0.35 or right_chest_dist < torso_height * 0.35:
+            s.append("CHEST_CONTACT")
+            acts.append("MOLESTATION_SIGNAL")
+        
+        # Lower body contact (sexual assault/molestation indication) - NEW
+        if self._distance(left_wrist, lower_torso_pos) < torso_height * 0.35 or \
+           self._distance(right_wrist, lower_torso_pos) < torso_height * 0.35:
+            if chest_pos[1] - lower_torso_pos[1] > 0:  # Ensure it's the lower body
+                s.append("LOWER_BODY_CONTACT")
+                acts.append("SEXUAL_ASSAULT_SIGNAL")
+        
+        # Hair grabbing (harassment/assault) - NEW
+        head_y = nose[1]
+        if self._distance(left_wrist, [nose[0], head_y]) < torso_height * 0.25 or \
+           self._distance(right_wrist, [nose[0], head_y]) < torso_height * 0.25:
+            s.append("HAIR_GRAB")
+            acts.append("HARASSMENT_SIGNAL")
+        
+        # Defensive shielding gesture (victim protection) - NEW
+        if (left_wrist[1] < left_shoulder[1] - torso_height * 0.1 and 
+            left_elbow[1] < left_shoulder[1]) or \
+           (right_wrist[1] < right_shoulder[1] - torso_height * 0.1 and 
+            right_elbow[1] < right_shoulder[1]):
+            acts.append("DEFENSIVE_SHIELD")
+        
+        # Restraining arm lock (against torso) - NEW
+        if (abs(left_wrist[0] - right_shoulder[0]) < shoulder_width * 0.4 and
+            abs(left_wrist[1] - right_shoulder[1]) < torso_height * 0.3) or \
+           (abs(right_wrist[0] - left_shoulder[0]) < shoulder_width * 0.4 and
+            abs(right_wrist[1] - left_shoulder[1]) < torso_height * 0.3):
+            s.append("ARM_LOCK")
+            acts.append("RESTRAINT_ATTEMPT")
+        
+        # ---- STANDARD DETECTION ----
+        
         # Fallen person (improved)
         body_verticality = self._calculate_body_verticality(k)
         if body_verticality < 0.4:  # Slightly higher threshold
@@ -190,6 +238,35 @@ class PoseCrimeDetector:
                 frame_diagonal = self._calculate_frame_diagonal(boxes[i], boxes[j])
                 
                 normalized_distance = distance / frame_diagonal if frame_diagonal > 0 else 1.0
+                
+                # ---- WOMEN-SPECIFIC CRIME INTERACTIONS ----
+                
+                # Rear approach (stalking/sexual assault indicator) - NEW
+                if self._is_rear_approach(kps_all[i], kps_all[j]):
+                    s.append("REAR_APPROACH")
+                    acts.append("STALKING_SIGNAL")
+                
+                # Unwanted proximity from behind - NEW
+                if self._is_close_rear_contact(kps_all[i], kps_all[j], normalized_distance):
+                    s.append("REAR_CONTACT")
+                    acts.append("HARASSMENT_SIGNAL")
+                
+                # Downward arm positioning over another person (restraint/control) - NEW
+                if self._is_restraining_hold(kps_all[i], kps_all[j]):
+                    s.append("RESTRAINING_HOLD")
+                    acts.append("CONFINEMENT_SIGNAL")
+                
+                # Circle surrounding pattern (mob mentality/collective crime) - NEW
+                if n >= 3 and self._is_surrounding_pattern(kps_all, i, j):
+                    s.append("SURROUNDING_PATTERN")
+                    acts.append("GROUP_HARASSMENT")
+                
+                # Hands on shoulders from behind (control/force) - NEW
+                if self._is_shoulder_control(kps_all[i], kps_all[j]):
+                    s.append("SHOULDER_CONTROL")
+                    acts.append("PHYSICAL_CONTROL")
+                
+                # ---- STANDARD INTERACTIONS ----
                 
                 # Close contact (based on body proportions) - increased thresholds
                 if normalized_distance < 0.4:  # More sensitive
@@ -439,7 +516,17 @@ class PoseCrimeDetector:
             "DIRECT_ASSAULT": 40,  # Increased
             "POWER_IMBALANCE": 25,  # Increased
             "VULNERABLE_POSITION": 30,  # Increased
-            "BODY_COLLISION": 30  # Increased
+            "BODY_COLLISION": 30,  # Increased
+            # Women-specific crimes
+            "CHEST_CONTACT": 35,
+            "LOWER_BODY_CONTACT": 40,
+            "HAIR_GRAB": 28,
+            "ARM_LOCK": 32,
+            "REAR_APPROACH": 20,
+            "REAR_CONTACT": 32,
+            "RESTRAINING_HOLD": 38,
+            "SHOULDER_CONTROL": 30,
+            "SURROUNDING_PATTERN": 35
         }
         
         # Activity weights - increased weights
@@ -449,7 +536,17 @@ class PoseCrimeDetector:
             "AGGRESSIVE_GESTURE": 15, "KICKING_MOTION": 15,
             "FOLLOWING_CHASING": 20, "CROWD_FORMATION": 15,
             "DEFENSIVE_POSTURE": 25,  # Increased
-            "DOMINANT_POSITION": 25  # Increased
+            "DOMINANT_POSITION": 25,  # Increased
+            # Women-specific activities
+            "MOLESTATION_SIGNAL": 38,
+            "SEXUAL_ASSAULT_SIGNAL": 45,
+            "HARASSMENT_SIGNAL": 28,
+            "DEFENSIVE_SHIELD": 22,
+            "RESTRAINT_ATTEMPT": 35,
+            "STALKING_SIGNAL": 30,
+            "GROUP_HARASSMENT": 32,
+            "PHYSICAL_CONTROL": 30,
+            "CONFINEMENT_SIGNAL": 40
         }
         
         # Add signal scores
@@ -473,7 +570,7 @@ class PoseCrimeDetector:
         return min(100, score)
     
     # -------------------------------------------------
-    # IMPROVED CLASSIFICATION
+    # IMPROVED CLASSIFICATION - 20+ Crime Types
     # -------------------------------------------------
     def _classify(self, signals, activities, persons):
         s = set(signals)
@@ -484,7 +581,82 @@ class PoseCrimeDetector:
         has_kick = any(sig.startswith("KICK") for sig in s)
         has_assault_signal = any(sig in ["ASSAULT_HEAD", "BODY_CONTACT", "DIRECT_ASSAULT"] for sig in s)
         has_physical_contact = any(sig in ["CLOSE_CONTACT", "BODY_COLLISION", "GRABBING"] for sig in s)
+        
+        # Women-specific crime indicators
+        has_chest_contact = "CHEST_CONTACT" in s
+        has_lower_body_contact = "LOWER_BODY_CONTACT" in s
+        has_hair_grab = "HAIR_GRAB" in s
+        has_rear_contact = "REAR_CONTACT" in s
+        has_restraining_hold = "RESTRAINING_HOLD" in s
+        has_shoulder_control = "SHOULDER_CONTROL" in s
+        has_sexual_assault_signal = "SEXUAL_ASSAULT_SIGNAL" in a
 
+        # ---- CRITICAL WOMEN-RELATED CRIMES ----
+        
+        # Sexual Assault / Molestation - HIGH PRIORITY
+        if (has_lower_body_contact or has_chest_contact or has_hair_grab) and \
+           (has_physical_contact or "CLOSE_CONTACT" in s):
+            if has_lower_body_contact:
+                return "Sexual Assault / Molestation", "CRITICAL"
+            else:
+                return "Eve Teasing / Harassment", "HIGH"
+        
+        # Attempted Rape / Sexual Assault - CRITICAL
+        if has_lower_body_contact and has_restraining_hold and persons == 2:
+            return "Attempted Rape / Sexual Assault", "CRITICAL"
+        
+        # Rape / Sexual Violence - CRITICAL
+        if has_sexual_assault_signal and "RESTRAINT_ATTEMPT" in a and \
+           (has_restraining_hold or "ARM_LOCK" in s):
+            return "Rape / Sexual Violence", "CRITICAL"
+        
+        # Stalking
+        if "STALKING_SIGNAL" in a and (has_rear_contact or "FOLLOWING_CHASING" in a):
+            return "Stalking / Harassment", "HIGH"
+        
+        # Domestic Violence
+        if persons == 2 and (has_assault_signal or has_punch or has_kick) and \
+           (has_restraining_hold or "DOMINANT_POSITION" in a):
+            return "Domestic Violence", "CRITICAL"
+        
+        # Eve Teasing / Street Harassment
+        if has_rear_contact and "HARASSMENT_SIGNAL" in a and not has_restraining_hold:
+            return "Eve Teasing / Street Harassment", "HIGH"
+        
+        # Forced Confinement / Kidnapping
+        if "CONFINEMENT_SIGNAL" in a and has_restraining_hold and \
+           ("SURROUNDING_PATTERN" in s or persons >= 2):
+            return "Forced Confinement / Kidnapping", "CRITICAL"
+        
+        # Human Trafficking (group with restraint)
+        if "GROUP_HARASSMENT" in a and has_restraining_hold and persons >= 3:
+            return "Human Trafficking / Abduction", "CRITICAL"
+        
+        # Dowry-related Violence
+        if "DOMINANT_POSITION" in a and has_assault_signal and \
+           has_physical_contact and persons == 2:
+            return "Dowry Violence / Domestic Abuse", "HIGH"
+        
+        # Honor Crime (public violence against woman)
+        if "GROUP_HARASSMENT" in a and has_assault_signal and persons >= 3:
+            return "Honor Crime / Mob Violence", "CRITICAL"
+        
+        # Indecent Assault / Groping
+        if (has_chest_contact or has_hair_grab) and not has_lower_body_contact:
+            if "CLOSE_CONTACT" in s and not has_restraining_hold:
+                return "Indecent Assault / Groping", "HIGH"
+        
+        # Human Trafficking (movement with restraint)
+        if "FOLLOWING_CHASING" in a and has_restraining_hold:
+            return "Human Trafficking", "CRITICAL"
+        
+        # Kidnapping
+        if "GRABBING" in s and "RESTRAINING_MOTION" in a and \
+           ("FOLLOWING_CHASING" in a or has_restraining_hold):
+            return "Kidnapping / Abduction", "CRITICAL"
+        
+        # ---- GENERAL CRIMES ----
+        
         # CRITICAL: Woman Assault / Physical Violence detection for the image
         if persons >= 2 and (has_assault_signal or has_punch or has_kick) and has_physical_contact:
             if "VULNERABLE_POSITION" in s or "POWER_IMBALANCE" in s:
@@ -540,6 +712,97 @@ class PoseCrimeDetector:
 
         return "Normal", "LOW"
 
+    
+    # ---- WOMEN-SPECIFIC CRIME HELPER METHODS ----
+    
+    def _is_rear_approach(self, kps1, kps2):
+        """Detect if one person is approaching another from behind"""
+        pos1 = self._get_hip_center(kps1)
+        pos2 = self._get_hip_center(kps2)
+        
+        if pos1 is None or pos2 is None:
+            return False
+        
+        # Get facing direction of person 2
+        facing_dir = self._get_facing_direction(kps2)
+        
+        # Vector from person2 to person1
+        vec_to_person1 = [pos1[0] - pos2[0], pos1[1] - pos2[1]]
+        mag = math.sqrt(vec_to_person1[0]**2 + vec_to_person1[1]**2)
+        
+        if mag < 1e-6:
+            return False
+        
+        vec_to_person1 = [vec_to_person1[0]/mag, vec_to_person1[1]/mag]
+        
+        # If person1 is behind person2 (opposite to facing direction)
+        dot = facing_dir[0]*vec_to_person1[0] + facing_dir[1]*vec_to_person1[1]
+        return dot < -0.3  # Behind threshold
+    
+    def _is_close_rear_contact(self, kps1, kps2, normalized_distance):
+        """Detect close contact from behind (harassment pattern)"""
+        if not self._is_rear_approach(kps1, kps2):
+            return False
+        return normalized_distance < 0.25
+    
+    def _is_restraining_hold(self, kps1, kps2):
+        """Detect arm positioning suggesting restraint"""
+        # Check if person1's wrists are positioned downward on person2's body
+        hip_center = self._get_hip_center(kps2)
+        
+        if hip_center is None:
+            return False
+        
+        # If both wrists are below shoulder level and close to target
+        wrist1_low = kps1[9][1] > kps1[5][1] and kps1[10][1] > kps1[6][1]
+        wrist1_close_x = abs(kps1[9][0] - hip_center[0]) < 50 and abs(kps1[10][0] - hip_center[0]) < 50
+        
+        return wrist1_low and wrist1_close_x
+    
+    def _is_shoulder_control(self, kps1, kps2):
+        """Detect hands on shoulders from behind (control gesture)"""
+        shoulder_l2 = kps2[5]
+        shoulder_r2 = kps2[6]
+        
+        # Check if wrists are near shoulders
+        left_wrist_near = self._distance(kps1[9], shoulder_l2) < 40
+        right_wrist_near = self._distance(kps1[10], shoulder_r2) < 40
+        
+        return left_wrist_near or right_wrist_near
+    
+    def _is_surrounding_pattern(self, kps_all, idx_i, idx_j):
+        """Detect if people are forming a surrounding/mob pattern"""
+        if len(kps_all) < 3:
+            return False
+        
+        target_idx = idx_j
+        other_centers = []
+        
+        for k, kps in enumerate(kps_all):
+            if k != target_idx:
+                center = self._get_hip_center(kps)
+                if center is not None:
+                    other_centers.append(center)
+        
+        if len(other_centers) < 2:
+            return False
+        
+        target_center = self._get_hip_center(kps_all[target_idx])
+        
+        # Check if others are surrounding (distributed around target)
+        angles = []
+        for center in other_centers:
+            vec = [center[0] - target_center[0], center[1] - target_center[1]]
+            angle = math.atan2(vec[1], vec[0])
+            angles.append(angle)
+        
+        # Check if angles are spread out (not all in one direction)
+        angles_sorted = sorted(angles)
+        if len(angles_sorted) >= 2:
+            total_spread = max(angles_sorted) - min(angles_sorted)
+            return total_spread > math.pi / 2  # Spread > 90 degrees
+        
+        return False
     
     # -------------------------------------------------
     # UTILITY METHODS
