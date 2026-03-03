@@ -78,19 +78,19 @@ export default function AdminSidebar() {
           </Link>
 
           <Link
-            href="/dashboard/admin/analytics"
+            href="/analytics"
             className={navItemClass(
-              isActive("/dashboard/admin/analytics")
+              isActive("/analytics")
             )}
           >
             <BarChart3
               className={iconClass(
-                isActive("/dashboard/admin/analytics")
+                isActive("/analytics")
               )}
             />
             <span
               className={labelClass(
-                isActive("/dashboard/admin/analytics")
+                isActive("/analytics")
               )}
             >
               Analytics

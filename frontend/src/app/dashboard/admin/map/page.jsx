@@ -19,27 +19,26 @@ export default function AdminMapPage() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
 
-      // 🔐 Get REAL role from token
       const tokenResult = await user.getIdTokenResult(true);
       const role = tokenResult.claims.role;
 
-      // 1️⃣ Fetch all incidents
       const incidentSnap = await getDocs(collection(db, "incidents"));
       const allIncidents = incidentSnap.docs.map((d) => ({
         id: d.id,
         ...d.data(),
       }));
 
-      // 2️⃣ ADMIN → see all
       if (role === "admin") {
         setIncidents(allIncidents);
         setLoading(false);
         return;
       }
 
-      // 3️⃣ OPERATOR → restrict by camera areas
       const operatorSnap = await getDoc(
         doc(db, "operators", user.uid)
       );
@@ -58,7 +57,6 @@ export default function AdminMapPage() {
         return;
       }
 
-      // 4️⃣ Fetch assigned cameras
       const cameraSnaps = await Promise.all(
         cameraIds.map((id) => getDoc(doc(db, "cameras", id)))
       );
@@ -67,7 +65,6 @@ export default function AdminMapPage() {
         .filter((snap) => snap.exists())
         .map((snap) => snap.data());
 
-      // 5️⃣ Distance filter (~1km)
       const filteredIncidents = allIncidents.filter((incident) => {
         if (!incident.location) return false;
 
@@ -99,13 +96,26 @@ export default function AdminMapPage() {
   }
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
-      <AdminSidebar />
-      <div className="flex-1">
-        <Navbar title="🌍 Incident Map" />
-        <div className="p-6">
+    <div className="flex h-screen overflow-hidden">
+      
+      {/* Sidebar - Static */}
+      <div className="w-64 bg-white shadow-md overflow-hidden">
+        <AdminSidebar />
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        
+        {/* Navbar */}
+        <div className="sticky top-0 z-10 bg-white shadow">
+          <Navbar title="🌍 Incident Map" />
+        </div>
+
+        {/* Page Content - Static */}
+        <div className="flex-1 p-6 bg-gray-100">
           <IncidentMap incidents={incidents} />
         </div>
+
       </div>
     </div>
   );

@@ -1,9 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
+import { useRouter } from "next/navigation";
 import { collection, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
 import dynamic from "next/dynamic";
+import Navbar from "@/components/Navbar";
+import AdminSidebar from "@/components/AdminSidebar";
 
 // ✅ Client-only charts
 const AnalyticsCharts = dynamic(
@@ -12,9 +16,31 @@ const AnalyticsCharts = dynamic(
 );
 
 export default function Analytics() {
+  const router = useRouter();
+  const checkedRef = useRef(false);
   const [dailyData, setDailyData] = useState([]);
   const [severityData, setSeverityData] = useState([]);
   const [cameraData, setCameraData] = useState([]);
+
+  useEffect(() => {
+    // ✅ ensure auth check runs only once
+    if (checkedRef.current) return;
+    checkedRef.current = true;
+
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+
+      const role = localStorage.getItem("role");
+      if (role !== "admin") {
+        router.replace("/dashboard/operator");
+      }
+    });
+
+    return () => unsub();
+  }, [router]);
 
   useEffect(() => {
     const fetchIncidents = async () => {
@@ -90,25 +116,31 @@ export default function Analytics() {
   };
 
   return (
-    <div className="app-shell">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <div className="app-badge">Operational insights</div>
-            <h1 className="mt-3 text-2xl font-semibold text-slate-900">
-              Crime analytics dashboard
-            </h1>
-            <p className="text-sm text-slate-600">
-              Track incident volume, severity distribution, and camera hotspots.
-            </p>
-          </div>
-        </div>
+    <div className="app-shell flex">
+      <AdminSidebar />
 
-        <AnalyticsCharts
-          dailyData={dailyData}
-          severityData={severityData}
-          cameraData={cameraData}
-        />
+      <div className="flex-1">
+        <Navbar title="📊 Crime Analytics Dashboard" />
+
+        <div className="mx-auto max-w-6xl px-6 py-8">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="app-badge">Operational insights</div>
+              <h1 className="mt-3 text-2xl font-semibold text-slate-900">
+                Crime analytics dashboard
+              </h1>
+              <p className="text-sm text-slate-600">
+                Track incident volume, severity distribution, and camera hotspots.
+              </p>
+            </div>
+          </div>
+
+          <AnalyticsCharts
+            dailyData={dailyData}
+            severityData={severityData}
+            cameraData={cameraData}
+          />
+        </div>
       </div>
     </div>
   );
