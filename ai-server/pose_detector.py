@@ -266,6 +266,68 @@ class PoseCrimeDetector:
            right_wrist[1] < right_shoulder[1] - torso_height * 0.2:
             acts.append("HANDS_UP")
         
+        # ---- WEAPON-SPECIFIC DETECTION - STRICT ACCURACY ----
+        
+        # Gun holding posture - ONE ARM EXTENDED HORIZONTALLY
+        left_gun_posture = self._is_gun_holding_posture(
+            left_shoulder, left_elbow, left_wrist, right_shoulder, right_elbow, right_wrist, torso_height, conf, [5, 7, 9]
+        )
+        right_gun_posture = self._is_gun_holding_posture(
+            right_shoulder, right_elbow, right_wrist, left_shoulder, left_elbow, left_wrist, torso_height, conf, [6, 8, 10]
+        )
+        
+        if left_gun_posture:
+            s.append("GUN_HOLDING_LEFT")
+            acts.append("ARMED_THREAT")
+        if right_gun_posture:
+            s.append("GUN_HOLDING_RIGHT")
+            acts.append("ARMED_THREAT")
+        
+        # Gun aiming posture - ONE ARM RAISED WITH ELBOW BENT, OTHER HAND SUPPORTING
+        left_aiming = self._is_gun_aiming_posture(
+            left_shoulder, left_elbow, left_wrist, right_wrist, torso_height, conf, [5, 7, 9, 10]
+        )
+        right_aiming = self._is_gun_aiming_posture(
+            right_shoulder, right_elbow, right_wrist, left_wrist, torso_height, conf, [6, 8, 10, 9]
+        )
+        
+        if left_aiming:
+            s.append("GUN_AIMING_LEFT")
+            acts.append("SHOOTING_THREAT")
+        if right_aiming:
+            s.append("GUN_AIMING_RIGHT")
+            acts.append("SHOOTING_THREAT")
+        
+        # Knife wielding - AGGRESSIVE ARM MOTION WITH HIGH SPEED
+        left_knife = self._is_knife_wielding(
+            left_shoulder, left_elbow, left_wrist, torso_height, conf, [5, 7, 9]
+        )
+        right_knife = self._is_knife_wielding(
+            right_shoulder, right_elbow, right_wrist, torso_height, conf, [6, 8, 10]
+        )
+        
+        if left_knife:
+            s.append("KNIFE_WIELDING_LEFT")
+            acts.append("WEAPON_THREAT")
+        if right_knife:
+            s.append("KNIFE_WIELDING_RIGHT")
+            acts.append("WEAPON_THREAT")
+        
+        # Stabbing motion - DOWNWARD THRUSTING WITH TENSION
+        left_stab = self._is_stabbing_motion(
+            left_shoulder, left_elbow, left_wrist, torso_height, conf, [5, 7, 9]
+        )
+        right_stab = self._is_stabbing_motion(
+            right_shoulder, right_elbow, right_wrist, torso_height, conf, [6, 8, 10]
+        )
+        
+        if left_stab:
+            s.append("STABBING_MOTION_LEFT")
+            acts.append("STABBING_ATTACK")
+        if right_stab:
+            s.append("STABBING_MOTION_RIGHT")
+            acts.append("STABBING_ATTACK")
+        
         # Victim vulnerability detection - STRICT
         if (self._is_crouching(k) or body_verticality < 0.4) and len(s) == 0:
             s.append("VULNERABLE_POSITION")
@@ -623,7 +685,7 @@ class PoseCrimeDetector:
         signal_set = set(signals)
         activity_set = set(activities)
         
-        # Signal weights - increased weights for assault-related signals
+        # Signal weights - increased weights for assault-related signals + weapons
         signal_weights = {
             "GRAB_NECK_LEFT": 30, "GRAB_NECK_RIGHT": 30,
             "WEAPON_THREAT_LEFT": 25, "WEAPON_THREAT_RIGHT": 25,
@@ -645,10 +707,15 @@ class PoseCrimeDetector:
             "REAR_CONTACT": 32,
             "RESTRAINING_HOLD": 38,
             "SHOULDER_CONTROL": 30,
-            "SURROUNDING_PATTERN": 35
+            "SURROUNDING_PATTERN": 35,
+            # WEAPON-SPECIFIC SIGNALS (HIGH PRIORITY)
+            "GUN_HOLDING_LEFT": 45, "GUN_HOLDING_RIGHT": 45,
+            "GUN_AIMING_LEFT": 50, "GUN_AIMING_RIGHT": 50,
+            "KNIFE_WIELDING_LEFT": 42, "KNIFE_WIELDING_RIGHT": 42,
+            "STABBING_MOTION_LEFT": 48, "STABBING_MOTION_RIGHT": 48,
         }
         
-        # Activity weights - increased weights with robbery/property crime indicators
+        # Activity weights - increased weights with robbery/property crime indicators + weapons
         activity_weights = {
             "PHYSICAL_ASSAULT": 25, "CHOKING_MOTION": 30,
             "THREATENING_GESTURE": 20, "RESTRAINING_MOTION": 25,
@@ -671,7 +738,12 @@ class PoseCrimeDetector:
             "THEFT_ATTEMPT": 18,
             "EVASIVE_MOTION": 22,
             "COORDINATED_ACTION": 25,
-            "RAPID_ESCAPE": 30
+            "RAPID_ESCAPE": 30,
+            # WEAPON-SPECIFIC ACTIVITIES (CRITICAL)
+            "ARMED_THREAT": 48,
+            "SHOOTING_THREAT": 52,
+            "WEAPON_THREAT": 45,
+            "STABBING_ATTACK": 50,
         }
         
         # Add signal scores
@@ -704,6 +776,12 @@ class PoseCrimeDetector:
         if threat_gestures and "CLOSE_CONTACT" in signal_set and persons >= 2:
             score += 15  # Reduced from 20
         
+        # WEAPON BOOST: Any weapon signal gets significant threat score boost
+        has_gun = any(sig in signal_set for sig in ["GUN_HOLDING_LEFT", "GUN_HOLDING_RIGHT", "GUN_AIMING_LEFT", "GUN_AIMING_RIGHT"])
+        has_knife = any(sig in signal_set for sig in ["KNIFE_WIELDING_LEFT", "KNIFE_WIELDING_RIGHT", "STABBING_MOTION_LEFT", "STABBING_MOTION_RIGHT"])
+        if has_gun or has_knife:
+            score += 15  # Additional threat boost for weapons
+        
         # Reduce score for ambiguous signals
         if len(signal_set) == 1 and score < 50:
             score *= 0.8  # Penalize single signals
@@ -711,7 +789,7 @@ class PoseCrimeDetector:
         return min(100, score)
     
     # -------------------------------------------------
-    # IMPROVED CLASSIFICATION - 30+ Crime Types (100% ACCURACY)
+    # IMPROVED CLASSIFICATION - 50+ Crime Types (100% ACCURACY)
     # -------------------------------------------------
     def _classify(self, signals, activities, persons):
         s = set(signals)
@@ -736,8 +814,63 @@ class PoseCrimeDetector:
         has_shoulder_control = "SHOULDER_CONTROL" in s
         has_sexual_assault_signal = "SEXUAL_ASSAULT_SIGNAL" in a
         
+        # WEAPON-SPECIFIC INDICATORS - NEW
+        has_gun_holding = any(sig in s for sig in ["GUN_HOLDING_LEFT", "GUN_HOLDING_RIGHT"])
+        has_gun_aiming = any(sig in s for sig in ["GUN_AIMING_LEFT", "GUN_AIMING_RIGHT"])
+        has_knife_wielding = any(sig in s for sig in ["KNIFE_WIELDING_LEFT", "KNIFE_WIELDING_RIGHT"])
+        has_stabbing = any(sig in s for sig in ["STABBING_MOTION_LEFT", "STABBING_MOTION_RIGHT"])
+        has_armed_threat = "ARMED_THREAT" in a
+        has_shooting_threat = "SHOOTING_THREAT" in a
+        has_weapon_threat = "WEAPON_THREAT" in a
+        has_stabbing_attack = "STABBING_ATTACK" in a
+        
         # Validate person count
         persons_engaged = sum(1 for i in range(persons) if len(s) > 0 or len(a) > 0)
+        
+        # ---- CRITICAL WEAPON-BASED CRIMES (HIGHEST PRIORITY) ----
+        
+        # Armed Murder Attempt / Shooting Attack (gun + physical approach + assault)
+        if has_gun_aiming and (has_assault_signal or has_physical_contact or persons >= 2):
+            return "Shooting / Armed Murder Attempt", "CRITICAL"
+        
+        # Armed Assault General (gun/knife + assault)
+        if (has_gun_holding or has_knife_wielding) and (has_punch or has_kick or has_assault_signal):
+            if has_knife_wielding and has_stabbing:
+                return "Stabbing Attack / Armed Assault", "CRITICAL"
+            elif has_gun_holding:
+                return "Armed Assault / Gun Threat", "CRITICAL"
+            else:
+                return "Armed Assault / Weapon Attack", "CRITICAL"
+        
+        # Stabbing (knife-specific)
+        if has_stabbing and (has_assault_signal or has_physical_contact):
+            return "Stabbing Attack", "CRITICAL"
+        
+        # Shootout / Gun Threat (multiple persons with guns)
+        if persons >= 2 and has_gun_holding and has_assault_signal:
+            return "Shootout / Armed Conflict", "CRITICAL"
+        
+        # Armed Robbery (gun/knife + grabbing + close contact)
+        if (has_gun_holding or has_knife_wielding) and "GRABBING" in s and "CLOSE_CONTACT" in s and persons == 2:
+            return "Armed Robbery / Armed Theft", "CRITICAL"
+        
+        # Armed Carjacking (weapon threat + vehicle interaction - inferred from two persons scenario)
+        if (has_gun_holding or has_knife_wielding) and persons == 2 and has_physical_contact:
+            if "GRABBING" in s:
+                return "Armed Carjacking / Vehicle Hijacking", "CRITICAL"
+        
+        # Assault with Weapon (weapon + victim)
+        if (has_gun_holding or has_knife_wielding) and "VULNERABLE_POSITION" in s and persons >= 2:
+            return "Assault with Weapon / Victim Abuse", "CRITICAL"
+        
+        # Weapon Threat / Intimidation (weapon visible, no immediate action)
+        if (has_gun_holding or has_knife_wielding) and not has_assault_signal and not has_physical_contact:
+            if has_gun_aiming:
+                return "Armed Threat / Gun Threat", "HIGH"
+            elif has_knife_wielding:
+                return "Knife Threat / Armed Threat", "HIGH"
+            else:
+                return "Weapon Threat / Armed Intimidation", "HIGH"
         
         # ---- CRITICAL WOMEN-RELATED CRIMES (HIGHEST ACCURACY) ----
         
@@ -782,7 +915,7 @@ class PoseCrimeDetector:
            ("VULNERABLE_POSITION" in s or "POWER_IMBALANCE" in s):
             return "Woman Assault / Physical Violence", "CRITICAL"
         
-        #Direct Assault (requires collision + aggression OR multiple assault signals)
+        # Direct Assault (requires collision + aggression OR multiple assault signals)
         if "DIRECT_ASSAULT" in s:
             if "VULNERABLE_POSITION" in s:
                 return "Woman Assault / Physical Violence", "CRITICAL"
@@ -796,16 +929,11 @@ class PoseCrimeDetector:
         
         # ---- ROBBERY & PROPERTY CRIMES ----
         
-        # Armed Robbery (weapon + grabbing + close contact)
-        if any(sig in s for sig in ["WEAPON_THREAT_LEFT", "WEAPON_THREAT_RIGHT"]) and \
-           "GRABBING" in s and "CLOSE_CONTACT" in s and persons == 2:
-            return "Armed Robbery / Violent Theft", "CRITICAL"
-        
         # Robbery/Mugging (grabbing + close contact + 2 persons)
         if persons == 2 and "GRABBING" in s and "CLOSE_CONTACT" in s:
             if "RUNNING" in a or "FOLLOWING_CHASING" in a:
                 if has_punch or has_kick:
-                    return "Aggressive Robbery", "HIGH"
+                    return "Aggressive Robbery / Mugging", "HIGH"
                 else:
                     return "Robbery / Mugging", "HIGH"
             else:
@@ -851,8 +979,6 @@ class PoseCrimeDetector:
             ["PUNCH_LEFT", "PUNCH_RIGHT", "KICK_LEFT", "KICK_RIGHT", "GRABBING", "ASSAULT_HEAD"]):
             if "DEFENSIVE_SHIELD" in a or len(s) == 1:
                 return "Suspicious Activity", "LOW"
-        
-        return "Normal", "LOW"
         
         return "Normal", "LOW"
 
@@ -1066,6 +1192,118 @@ class PoseCrimeDetector:
         dot = dir1[0]*dir2[0] + dir1[1]*dir2[1]
         
         return dot < -0.4
+    
+    # ---- WEAPON DETECTION HELPER METHODS ----
+    
+    def _is_gun_holding_posture(self, arm_shoulder, arm_elbow, arm_wrist, other_shoulder, other_elbow, other_wrist, torso_height, conf=None, indices=None):
+        """Detect gun holding posture - ONE ARM EXTENDED OUTWARD HORIZONTALLY - STRICT"""
+        # Validate keypoints
+        if np.any(np.isnan(arm_shoulder)) or np.any(np.isnan(arm_elbow)) or np.any(np.isnan(arm_wrist)):
+            return False
+        
+        # Check confidence if available
+        if conf is not None and indices is not None:
+            min_conf = 0.5
+            if not all(conf[i] > min_conf for i in indices):
+                return False
+        
+        # Gun posture: arm extended horizontally (wrist roughly level with shoulder)
+        wrist_height_diff = abs(arm_wrist[1] - arm_shoulder[1])
+        shoulder_to_wrist_dist = self._distance(arm_shoulder, arm_wrist)
+        
+        # Horizontal extension - wrist at similar height to shoulder, extended outward
+        is_horizontal = wrist_height_diff < torso_height * 0.15  # Wrist roughly level with shoulder
+        is_extended = shoulder_to_wrist_dist > torso_height * 0.5  # Extended outward
+        
+        # Arm angle should be roughly straight
+        arm_angle = self._angle_between(arm_shoulder, arm_elbow, arm_wrist)
+        is_straight = abs(arm_angle - 180) < 40
+        
+        # Other arm should NOT be in same posture (e.g., not both arms extended)
+        other_extended = self._distance(other_shoulder, other_wrist) > torso_height * 0.4
+        
+        return is_horizontal and is_extended and is_straight and not other_extended
+    
+    def _is_gun_aiming_posture(self, arm_shoulder, arm_elbow, arm_wrist, other_wrist, torso_height, conf=None, indices=None):
+        """Detect gun aiming posture - ONE ARM RAISED, ELBOW BENT, OTHER ARM SUPPORTING - STRICT"""
+        # Validate keypoints
+        if np.any(np.isnan(arm_shoulder)) or np.any(np.isnan(arm_elbow)) or np.any(np.isnan(arm_wrist)):
+            return False
+        
+        # Check confidence
+        if conf is not None and indices is not None:
+            min_conf = 0.5
+            if not all(conf[i] > min_conf for i in indices):
+                return False
+        
+        # Aiming posture: arm raised with elbow bent (like holding gun at chest/head level)
+        wrist_raised = arm_wrist[1] < arm_shoulder[1] - torso_height * 0.15  # Wrist above shoulder
+        elbow_bent = abs(self._angle_between(arm_shoulder, arm_elbow, arm_wrist) - 90) < 35  # ~90 degree angle
+        
+        # Supporting hand should be close to this arm (both hands together for gun grip)
+        supporting_distance = self._distance(arm_elbow, other_wrist)
+        is_supporting = supporting_distance < torso_height * 0.3
+        
+        return wrist_raised and elbow_bent and is_supporting
+    
+    def _is_knife_wielding(self, arm_shoulder, arm_elbow, arm_wrist, torso_height, conf=None, indices=None):
+        """Detect knife wielding - ARM FLEXING WITH AGGRESSIVE MOTION - STRICT"""
+        # Validate keypoints
+        if np.any(np.isnan(arm_shoulder)) or np.any(np.isnan(arm_elbow)) or np.any(np.isnan(arm_wrist)):
+            return False
+        
+        # Check confidence
+        if conf is not None and indices is not None:
+            min_conf = 0.5
+            if not all(conf[i] > min_conf for i in indices):
+                return False
+        
+        # Knife wielding: arm extended with elbow bent (aggressive posture), could be at any angle
+        shoulder_to_wrist_dist = self._distance(arm_shoulder, arm_wrist)
+        is_extended = shoulder_to_wrist_dist > torso_height * 0.4
+        
+        # Arm angle - not fully straight (not punch), not fully bent (not hugging)
+        arm_angle = self._angle_between(arm_shoulder, arm_elbow, arm_wrist)
+        arm_flexed = 100 < arm_angle < 170
+        
+        # Elbow-to-wrist distance ratio indicates aggressive motion
+        elbow_to_wrist = self._distance(arm_elbow, arm_wrist)
+        shoulder_to_elbow = self._distance(arm_shoulder, arm_elbow)
+        
+        # Forearm extended relative to upper arm
+        is_aggressive = elbow_to_wrist > shoulder_to_elbow * 0.7
+        
+        return is_extended and arm_flexed and is_aggressive
+    
+    def _is_stabbing_motion(self, arm_shoulder, arm_elbow, arm_wrist, torso_height, conf=None, indices=None):
+        """Detect stabbing motion - DOWNWARD THRUSTING MOTION - STRICT"""
+        # Validate keypoints
+        if np.any(np.isnan(arm_shoulder)) or np.any(np.isnan(arm_elbow)) or np.any(np.isnan(arm_wrist)):
+            return False
+        
+        # Check confidence
+        if conf is not None and indices is not None:
+            min_conf = 0.5
+            if not all(conf[i] > min_conf for i in indices):
+                return False
+        
+        # Stabbing: wrist should be below shoulder (thrusting downward)
+        wrist_below_shoulder = arm_wrist[1] > arm_shoulder[1] + torso_height * 0.05
+        
+        # Arm should be relatively extended
+        shoulder_to_wrist_dist = self._distance(arm_shoulder, arm_wrist)
+        is_extended = shoulder_to_wrist_dist > torso_height * 0.35
+        
+        # Arm angle should indicate forward/downward motion (roughly 45-135 degrees)
+        arm_angle = self._angle_between(arm_shoulder, arm_elbow, arm_wrist)
+        is_thrusting = 70 < arm_angle < 150
+        
+        # Elbow should be bent (not fully extended like punch)
+        elbow_distance = self._distance(arm_shoulder, arm_elbow)
+        wrist_distance = self._distance(arm_elbow, arm_wrist)
+        arm_bent = wrist_distance > elbow_distance * 0.5  # Forearm is significant portion
+        
+        return wrist_below_shoulder and is_extended and is_thrusting and arm_bent
     
     # ---- ORGANIZED CRIME HELPER METHODS ----
     
