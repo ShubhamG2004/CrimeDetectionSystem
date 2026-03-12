@@ -10,6 +10,7 @@ import {
   Users,
   ClipboardList,
   Shield,
+  Building2,
 } from "lucide-react";
 
 export default function AdminSidebar() {
@@ -154,6 +155,16 @@ export default function AdminSidebar() {
               )}
             >
               Operator Logs
+            </span>
+          </Link>
+
+          <Link
+            href="/police-stations"
+            className={navItemClass(isActive("/police-stations"))}
+          >
+            <Building2 className={iconClass(isActive("/police-stations"))} />
+            <span className={labelClass(isActive("/police-stations"))}>
+              Police Stations
             </span>
           </Link>
         </nav>
