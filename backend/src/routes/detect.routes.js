@@ -4,6 +4,7 @@ const axios = require("axios");
 const FormData = require("form-data");
 const cloudinary = require("../config/cloudinary");
 const { admin, db } = require("../config/firebase");
+const { findNearestStation } = require("../controllers/policeStation.controller");
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -150,10 +151,40 @@ router.post("/image", upload.single("image"), async (req, res) => {
 
     console.log("✅ INCIDENT SAVED:", docRef.id);
 
+    /* ---------- NEAREST POLICE STATION ---------- */
+    let nearestStation = null;
+    try {
+      nearestStation = await findNearestStation(
+        location.lat,
+        location.lng
+      );
+      if (nearestStation) {
+        await db
+          .collection("incidents")
+          .doc(docRef.id)
+          .update({ nearestStation });
+        console.log(
+          `🚓 Nearest station: ${nearestStation.stationName} (${nearestStation.distanceKm} km)`
+        );
+      }
+    } catch (stationErr) {
+      console.warn("⚠️ Could not find nearest station:", stationErr.message);
+    }
+
+    /* ---------- SOCKET.IO ALERT ---------- */
+    const io = req.app.get("io");
+    if (io) {
+      io.emit("new-incident", {
+        id: docRef.id,
+        ...incidentData,
+        nearestStation,
+      });
+    }
+
     return res.status(201).json({
       success: true,
       incidentId: docRef.id,
-      data: incidentData,
+      data: { ...incidentData, nearestStation },
     });
   } catch (err) {
     console.error("❌ IMAGE DETECT ERROR:", err);

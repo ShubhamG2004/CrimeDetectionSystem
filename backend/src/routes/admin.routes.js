@@ -3,6 +3,7 @@ const router = express.Router();
 const { admin } = require("../config/firebase");
 const { verifyToken, requireAdmin } = require("../middleware/auth");
 const { logOperatorActivity } = require("../utils/logOperatorActivity");
+const psCtrl = require("../controllers/policeStation.controller");
 
 /* ======================================================
    ➕ CREATE OPERATOR (ADMIN ONLY)
@@ -272,6 +273,25 @@ router.post("/_make-operator", async (req, res) => {
     });
   }
 });
+
+/* ======================================================
+   🏫 POLICE STATION ROUTES (ADMIN ONLY)
+   ====================================================== */
+
+// Create
+router.post("/police-station", verifyToken, requireAdmin, psCtrl.createPoliceStation);
+
+// List all
+router.get("/police-stations", verifyToken, requireAdmin, psCtrl.listPoliceStations);
+
+// Get one
+router.get("/police-station/:id", verifyToken, requireAdmin, psCtrl.getPoliceStation);
+
+// Update
+router.put("/police-station/:id", verifyToken, requireAdmin, psCtrl.updatePoliceStation);
+
+// Delete
+router.delete("/police-station/:id", verifyToken, requireAdmin, psCtrl.deletePoliceStation);
 
 
 module.exports = router;
