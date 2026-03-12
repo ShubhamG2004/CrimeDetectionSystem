@@ -3,9 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
+import dynamic from "next/dynamic";
 import { auth } from "@/lib/firebase";
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
+
+const LocationPickerMap = dynamic(
+  () => import("@/components/LocationPickerMap"),
+  { ssr: false }
+);
 
 const API = "http://localhost:5000/api/admin";
 
@@ -14,8 +20,6 @@ const emptyForm = {
   stationCode: "",
   city: "",
   area: "",
-  latitude: "",
-  longitude: "",
   contactNumber: "",
   emergencyNumber: "",
   alertEmail: "",
@@ -32,6 +36,7 @@ export default function PoliceStationsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
+  const [pinLocation, setPinLocation] = useState(null); // { lat, lng }
   const [saving, setSaving] = useState(false);
 
   /* ─── AUTH GUARD ─── */
@@ -80,8 +85,8 @@ export default function PoliceStationsPage() {
         location: {
           city: form.city,
           area: form.area,
-          latitude: form.latitude ? Number(form.latitude) : null,
-          longitude: form.longitude ? Number(form.longitude) : null,
+          latitude: pinLocation?.lat ?? null,
+          longitude: pinLocation?.lng ?? null,
         },
         contactNumber: form.contactNumber,
         emergencyNumber: form.emergencyNumber,
@@ -142,14 +147,15 @@ export default function PoliceStationsPage() {
       stationCode: s.stationCode || "",
       city: s.location?.city || "",
       area: s.location?.area || "",
-      latitude: s.location?.latitude ?? "",
-      longitude: s.location?.longitude ?? "",
       contactNumber: s.contactNumber || "",
       emergencyNumber: s.emergencyNumber || "",
       alertEmail: s.alertEmail || "",
       officerInCharge: s.officerInCharge || "",
       jurisdictionRadius: s.jurisdictionRadius ?? "",
     });
+    const lat = s.location?.latitude;
+    const lng = s.location?.longitude;
+    setPinLocation(lat != null && lng != null ? { lat, lng } : null);
     setShowModal(true);
   };
 
@@ -157,6 +163,7 @@ export default function PoliceStationsPage() {
     setShowModal(false);
     setEditingId(null);
     setForm(emptyForm);
+    setPinLocation(null);
   };
 
   const field = (key, placeholder, type = "text") => (
@@ -304,8 +311,6 @@ export default function PoliceStationsPage() {
                 {field("officerInCharge", "Officer In Charge")}
                 {field("city", "City")}
                 {field("area", "Area")}
-                {field("latitude", "Latitude", "number")}
-                {field("longitude", "Longitude", "number")}
                 {field("contactNumber", "Contact Number *")}
                 {field("emergencyNumber", "Emergency Number")}
                 <div className="col-span-2">
@@ -319,6 +324,26 @@ export default function PoliceStationsPage() {
                   )}
                 </div>
               </div>
+
+              {/* ── MAP PICKER ── */}
+              <p className="text-xs font-medium text-slate-600 mb-1 mt-1">
+                📍 Click on the map to set station location
+              </p>
+              <LocationPickerMap
+                value={pinLocation}
+                onChange={setPinLocation}
+                height="220px"
+              />
+              {pinLocation && (
+                <p className="text-xs text-emerald-600 mt-1">
+                  ✅ {pinLocation.lat}, {pinLocation.lng}
+                </p>
+              )}
+              {!pinLocation && (
+                <p className="text-xs text-slate-400 mt-1">
+                  No location pinned yet
+                </p>
+              )}
 
               <div className="flex justify-end gap-2 mt-2">
                 <button
