@@ -159,11 +159,11 @@ export default function AdminSidebar() {
           </Link>
 
           <Link
-            href="/police-stations"
-            className={navItemClass(isActive("/police-stations"))}
+            href="/dashboard/admin/police-stations"
+            className={navItemClass(isActive("/dashboard/admin/police-stations"))}
           >
-            <Building2 className={iconClass(isActive("/police-stations"))} />
-            <span className={labelClass(isActive("/police-stations"))}>
+            <Building2 className={iconClass(isActive("/dashboard/admin/police-stations"))} />
+            <span className={labelClass(isActive("/dashboard/admin/police-stations"))}>
               Police Stations
             </span>
           </Link>
