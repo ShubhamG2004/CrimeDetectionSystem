@@ -1,0 +1,68 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isFieldOperator() {
+      return hasRole('field_operator');
+    }
+
+    function isValidCameraStatus(status) {
+      return status in ['pending', 'approved', 'rejected'];
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    match /operators/{operatorId} {
+      allow read: if isSignedIn() && (isAdmin() || request.auth.uid == operatorId);
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /policeStations/{stationId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /cameras/{cameraId} {
+      allow read: if isSignedIn();
+
+      // Field operators can submit new cameras only in pending state for themselves.
+      allow create: if isFieldOperator() &&
+        request.resource.data.addedBy == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.approvedBy == null &&
+        request.resource.data.createdAt != null;
+
+      // Admin can approve/reject camera status.
+      allow update: if isAdmin() &&
+        isValidCameraStatus(request.resource.data.status);
+
+      allow delete: if isAdmin();
+    }
+
+    match /operatorLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

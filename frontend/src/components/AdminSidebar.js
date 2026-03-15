@@ -99,19 +99,19 @@ export default function AdminSidebar() {
           </Link>
 
           <Link
-            href="/cameras"
+            href="/dashboard/admin/cameras"
             className={navItemClass(
-              isActive("/cameras")
+              isActive("/dashboard/admin/cameras")
             )}
           >
             <Video
               className={iconClass(
-                isActive("/cameras")
+                isActive("/dashboard/admin/cameras")
               )}
             />
             <span
               className={labelClass(
-                isActive("/cameras")
+                isActive("/dashboard/admin/cameras")
               )}
             >
               Manage Cameras

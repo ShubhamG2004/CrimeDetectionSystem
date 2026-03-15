@@ -61,7 +61,7 @@ export default function AdminDashboard() {
           </a>
 
           <a
-            href="/cameras"
+            href="/dashboard/admin/cameras"
             className="app-card p-6 transition hover:shadow-md"
           >
             <h3 className="font-semibold text-lg text-slate-900">🎥 Camera Management</h3>
