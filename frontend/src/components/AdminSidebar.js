@@ -25,7 +25,7 @@ export default function AdminSidebar() {
   const navItemClass = (active) =>
     `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
       active
-        ? "bg-gradient-to-r from-blue-900 to-blue-700 text-white"
+        ? "bg-black text-white"
         : "text-gray-600 font-medium hover:bg-gray-100"
     }`;
 
