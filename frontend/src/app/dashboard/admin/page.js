@@ -66,7 +66,7 @@ export default function AdminDashboard() {
           >
             <h3 className="font-semibold text-lg text-slate-900">🎥 Camera Management</h3>
             <p className="text-sm text-slate-600">
-              Add / edit / remove cameras
+              Review pending submissions and approve active cameras
             </p>
           </a>
         </div>
