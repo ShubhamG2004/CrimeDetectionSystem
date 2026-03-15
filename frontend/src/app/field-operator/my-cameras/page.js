@@ -107,6 +107,7 @@ export default function MyCamerasPage() {
                   <th className="p-3 text-left">Police Station</th>
                   <th className="p-3 text-center">IP Address</th>
                   <th className="p-3 text-center">Status</th>
+                  <th className="p-3 text-center">Action</th>
                 </tr>
               </thead>
               <tbody className="text-slate-800 text-sm">
@@ -120,6 +121,26 @@ export default function MyCamerasPage() {
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusClass(cam.status)}`}>
                         {(cam.status || "pending").toUpperCase()}
                       </span>
+                    </td>
+                    <td className="p-3 text-center">
+                      <div className="flex items-center justify-center gap-2">
+                        <button
+                          type="button"
+                          disabled
+                          title="Edit disabled for Field Operator"
+                          className="rounded-md bg-slate-200 px-3 py-1 text-xs font-medium text-slate-500 cursor-not-allowed"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          disabled
+                          title="Delete disabled for Field Operator"
+                          className="rounded-md bg-slate-200 px-3 py-1 text-xs font-medium text-slate-500 cursor-not-allowed"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
