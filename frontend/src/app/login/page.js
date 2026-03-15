@@ -38,9 +38,6 @@ export default function Login() {
     },
   ];
 
-  const selectedRole =
-    roleOptions.find((option) => option.key === loginType) || roleOptions[0];
-
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
@@ -107,35 +104,7 @@ export default function Login() {
       <div className="pointer-events-none absolute -bottom-24 -right-16 h-96 w-96 rounded-full bg-cyan-200/25 blur-3xl" />
 
       <div className="relative z-10 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
-        <div className="w-full max-w-6xl rounded-3xl border border-slate-200 bg-white shadow-[0_25px_60px_rgba(15,23,42,0.14)] overflow-hidden">
-          <div className="grid lg:grid-cols-5">
-            <section className="hidden lg:flex lg:col-span-2 bg-linear-to-b from-slate-950 via-slate-900 to-slate-800 text-white p-10 xl:p-12 flex-col justify-between">
-              <div>
-                <p className="inline-flex items-center rounded-full border border-white/25 px-3 py-1 text-xs tracking-wide uppercase text-slate-200">
-                  Crime Detection System
-                </p>
-                <h1 className="mt-6 text-3xl xl:text-4xl font-semibold leading-tight">
-                  Secure Operations Portal
-                </h1>
-                <p className="mt-4 text-slate-300 text-sm leading-6">
-                  Centralized access for administrators and surveillance teams.
-                  Use approved credentials to continue to your workspace.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                <div className="rounded-xl border border-white/15 bg-white/5 p-4">
-                  <p className="text-xs uppercase tracking-wide text-slate-300">Current access profile</p>
-                  <p className="mt-2 text-lg font-medium text-white">{selectedRole.label}</p>
-                  <p className="mt-1 text-sm text-slate-300">{selectedRole.description}</p>
-                </div>
-                <p className="text-xs text-slate-400 leading-5">
-                  All authentication attempts are monitored and logged for platform security.
-                </p>
-              </div>
-            </section>
-
-            <section className="lg:col-span-3 p-6 sm:p-8 lg:p-10 xl:p-12">
+        <div className="w-full max-w-2xl rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 lg:p-10 xl:p-12 shadow-[0_25px_60px_rgba(15,23,42,0.14)]">
               <div className="max-w-xl mx-auto">
                 <div className="mb-8">
                   <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -254,8 +223,6 @@ export default function Login() {
                   </p>
                 </div>
               </div>
-            </section>
-          </div>
         </div>
       </div>
     </div>
