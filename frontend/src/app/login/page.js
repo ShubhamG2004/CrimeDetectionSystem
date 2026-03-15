@@ -17,6 +17,30 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const roleOptions = [
+    {
+      key: ROLES.ADMIN,
+      label: "Admin",
+      description: "Governance and platform control",
+      icon: Shield,
+    },
+    {
+      key: ROLES.OPERATOR,
+      label: "Operator",
+      description: "Real-time monitoring and response",
+      icon: User,
+    },
+    {
+      key: ROLES.FIELD_OPERATOR,
+      label: "Field Operator",
+      description: "Camera deployment and maintenance",
+      icon: User,
+    },
+  ];
+
+  const selectedRole =
+    roleOptions.find((option) => option.key === loginType) || roleOptions[0];
+
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
@@ -78,131 +102,160 @@ export default function Login() {
   };
 
   return (
-    <div className="app-shell flex items-center justify-center p-4">
-      <div className="w-full max-w-lg app-card p-8 lg:p-12">
-        <div className="max-w-md mx-auto">
-              <div className="text-center mb-8">
-                <div className="app-badge mx-auto w-fit">Secure access</div>
-                <h2 className="mt-4 text-2xl font-semibold text-slate-900">Sign in</h2>
-                <p className="text-slate-600 mt-2">Use your assigned credentials to continue</p>
-              </div>
+    <div className="min-h-screen bg-slate-100 relative overflow-hidden">
+      <div className="pointer-events-none absolute -top-28 -left-24 h-80 w-80 rounded-full bg-slate-300/35 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 -right-16 h-96 w-96 rounded-full bg-cyan-200/25 blur-3xl" />
 
-              {/* Role Selection */}
-              <div className="mb-8">
-                <div className="flex bg-slate-100/80 rounded-lg p-1 text-slate-700">
-                  <button
-                    type="button"
-                    onClick={() => setLoginType(ROLES.ADMIN)}
-                    className={`flex-1 py-3 px-4 rounded-md flex items-center justify-center space-x-2 transition-all ${
-                      loginType === ROLES.ADMIN
-                        ? "bg-white shadow text-slate-900"
-                        : "hover:bg-white/70"
-                    }`}
-                  >
-                    <Shield className="w-4 h-4" />
-                    <span>Admin</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLoginType(ROLES.OPERATOR)}
-                    className={`flex-1 py-3 px-4 rounded-md flex items-center justify-center space-x-2 transition-all ${
-                      loginType === ROLES.OPERATOR
-                        ? "bg-white shadow text-slate-900"
-                        : "hover:bg-white/70"
-                    }`}
-                  >
-                    <User className="w-4 h-4" />
-                    <span>Operator</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setLoginType(ROLES.FIELD_OPERATOR)}
-                    className={`flex-1 py-3 px-4 rounded-md flex items-center justify-center space-x-2 transition-all ${
-                      loginType === ROLES.FIELD_OPERATOR
-                        ? "bg-white shadow text-slate-900"
-                        : "hover:bg-white/70"
-                    }`}
-                  >
-                    <User className="w-4 h-4" />
-                    <span>Field Operator</span>
-                  </button>
-                </div>
-              </div>
-
-              {error && (
-                <div className="mb-6 p-4 bg-rose-50 border border-rose-200 rounded-lg">
-                  <div className="flex items-center text-rose-700 text-sm">
-                    <span className="font-medium">{error}</span>
-                  </div>
-                </div>
-              )}
-
-              <form onSubmit={handleLogin} className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Email Address
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
-                      <Mail className="h-5 w-5 text-slate-400" />
-                    </div>
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="app-input pl-10"
-                      placeholder="Enter your email"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
-                    Password
-                  </label>
-                  <div className="relative">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center">
-                      <Lock className="h-5 w-5 text-slate-400" />
-                    </div>
-                    <input
-                      type="password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      className="app-input pl-10"
-                      placeholder="Enter your password"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="app-button w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <div className="flex items-center justify-center">
-                      <svg className="animate-spin h-5 w-5 mr-3 text-white" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                      </svg>
-                      Signing in...
-                    </div>
-                  ) : (
-                    "Sign In"
-                  )}
-                </button>
-              </form>
-
-              <div className="mt-8 pt-6 border-t border-slate-200">
-                <p className="text-center text-sm text-slate-600">
-                  Need help?{" "}
-                  <a href="#" className="text-slate-900 hover:text-slate-700">
-                    Contact support
-                  </a>
+      <div className="relative z-10 min-h-screen flex items-center justify-center p-4 sm:p-6 lg:p-8">
+        <div className="w-full max-w-6xl rounded-3xl border border-slate-200 bg-white shadow-[0_25px_60px_rgba(15,23,42,0.14)] overflow-hidden">
+          <div className="grid lg:grid-cols-5">
+            <section className="hidden lg:flex lg:col-span-2 bg-linear-to-b from-slate-950 via-slate-900 to-slate-800 text-white p-10 xl:p-12 flex-col justify-between">
+              <div>
+                <p className="inline-flex items-center rounded-full border border-white/25 px-3 py-1 text-xs tracking-wide uppercase text-slate-200">
+                  Crime Detection System
+                </p>
+                <h1 className="mt-6 text-3xl xl:text-4xl font-semibold leading-tight">
+                  Secure Operations Portal
+                </h1>
+                <p className="mt-4 text-slate-300 text-sm leading-6">
+                  Centralized access for administrators and surveillance teams.
+                  Use approved credentials to continue to your workspace.
                 </p>
               </div>
+
+              <div className="space-y-4">
+                <div className="rounded-xl border border-white/15 bg-white/5 p-4">
+                  <p className="text-xs uppercase tracking-wide text-slate-300">Current access profile</p>
+                  <p className="mt-2 text-lg font-medium text-white">{selectedRole.label}</p>
+                  <p className="mt-1 text-sm text-slate-300">{selectedRole.description}</p>
+                </div>
+                <p className="text-xs text-slate-400 leading-5">
+                  All authentication attempts are monitored and logged for platform security.
+                </p>
+              </div>
+            </section>
+
+            <section className="lg:col-span-3 p-6 sm:p-8 lg:p-10 xl:p-12">
+              <div className="max-w-xl mx-auto">
+                <div className="mb-8">
+                  <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
+                    <Shield className="h-3.5 w-3.5" />
+                    Verified access only
+                  </div>
+                  <h2 className="mt-4 text-3xl font-semibold tracking-tight text-slate-900">
+                    Sign in to continue
+                  </h2>
+                  <p className="mt-2 text-sm text-slate-600">
+                    Select your access role and enter your assigned credentials.
+                  </p>
+                </div>
+
+                <div className="mb-7 grid grid-cols-1 sm:grid-cols-3 gap-2 rounded-2xl bg-slate-100 p-2">
+                  {roleOptions.map((option) => {
+                    const Icon = option.icon;
+                    const active = loginType === option.key;
+
+                    return (
+                      <button
+                        key={option.key}
+                        type="button"
+                        onClick={() => setLoginType(option.key)}
+                        className={`rounded-xl px-3 py-3 text-sm transition-all flex items-center justify-center gap-2 border ${
+                          active
+                            ? "bg-white border-slate-300 text-slate-900 shadow-sm"
+                            : "bg-transparent border-transparent text-slate-600 hover:bg-white/70"
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />
+                        <span>{option.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {error && (
+                  <div className="mb-6 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                    {error}
+                  </div>
+                )}
+
+                <form onSubmit={handleLogin} className="space-y-5">
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Email address
+                    </label>
+                    <div className="relative">
+                      <Mail className="pointer-events-none absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-4 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-slate-800 focus:ring-2 focus:ring-slate-800/15"
+                        placeholder="name@organization.com"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Password
+                    </label>
+                    <div className="relative">
+                      <Lock className="pointer-events-none absolute left-3 top-1/2 h-4.5 w-4.5 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="w-full rounded-xl border border-slate-300 bg-white py-3 pl-10 pr-4 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-slate-800 focus:ring-2 focus:ring-slate-800/15"
+                        placeholder="Enter your password"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className="w-full rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition-all hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {loading ? (
+                      <div className="flex items-center justify-center">
+                        <svg className="mr-3 h-5 w-5 animate-spin text-white" viewBox="0 0 24 24">
+                          <circle
+                            className="opacity-25"
+                            cx="12"
+                            cy="12"
+                            r="10"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            fill="none"
+                          />
+                          <path
+                            className="opacity-75"
+                            fill="currentColor"
+                            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                          />
+                        </svg>
+                        Signing in...
+                      </div>
+                    ) : (
+                      "Sign In"
+                    )}
+                  </button>
+                </form>
+
+                <div className="mt-8 border-t border-slate-200 pt-5">
+                  <p className="text-center text-sm text-slate-600">
+                    Need account support?{" "}
+                    <a href="#" className="font-medium text-slate-900 hover:text-black">
+                      Contact system administrator
+                    </a>
+                  </p>
+                </div>
+              </div>
+            </section>
+          </div>
         </div>
       </div>
     </div>
