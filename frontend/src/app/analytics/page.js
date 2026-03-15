@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { collection, getDocs } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
+import { ROLES } from "@/lib/roles";
 import dynamic from "next/dynamic";
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
@@ -34,8 +35,8 @@ export default function Analytics() {
       }
 
       const role = localStorage.getItem("role");
-      if (role !== "admin") {
-        router.replace("/dashboard/operator");
+      if (role !== ROLES.ADMIN) {
+        router.replace("/dashboard");
       }
     });
 

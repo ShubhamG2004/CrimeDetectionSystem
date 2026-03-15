@@ -110,6 +110,134 @@ router.post(
 );
 
 /* ======================================================
+   ➕ CREATE FIELD OPERATOR (ADMIN ONLY)
+   ====================================================== */
+router.post(
+  "/create-field-operator",
+  verifyToken,
+  requireAdmin,
+  async (req, res) => {
+    const { name, email, password } = req.body;
+
+    if (!name || !email || !password || password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email, and password (min 6 chars) are required",
+      });
+    }
+
+    let userRecord;
+
+    const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+    const isNetworkTimeout = (e) =>
+      e?.errorInfo?.code === "app/network-timeout" ||
+      /timeout/i.test(e?.message || "");
+
+    const createUserWithRetry = async (payload, attempts = 3) => {
+      let lastError;
+      for (let i = 1; i <= attempts; i++) {
+        try {
+          return await admin.auth().createUser(payload);
+        } catch (err) {
+          lastError = err;
+          if (!isNetworkTimeout(err) || i === attempts) throw err;
+          await sleep(500 * i);
+        }
+      }
+      throw lastError;
+    };
+
+    try {
+      userRecord = await createUserWithRetry({
+        displayName: name,
+        email,
+        password,
+        emailVerified: false,
+        disabled: false,
+      });
+
+      const uid = userRecord.uid;
+
+      await admin.auth().setCustomUserClaims(uid, {
+        role: "field_operator",
+      });
+
+      await admin.firestore().collection("users").doc(uid).set({
+        name,
+        email,
+        role: "field_operator",
+        status: "active",
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        createdBy: req.user.uid,
+      });
+
+      await logOperatorActivity({
+        operatorUid: uid,
+        operatorEmail: email,
+        action: "FIELD_OPERATOR_CREATED",
+        description: "Admin created a new field operator",
+        metadata: { createdBy: req.user.uid },
+      });
+
+      return res.status(201).json({
+        success: true,
+        uid,
+        message: "Field operator created successfully. User must re-login.",
+      });
+    } catch (err) {
+      console.error("❌ CREATE FIELD OPERATOR ERROR:", err);
+
+      if (userRecord?.uid) {
+        try {
+          await admin.auth().deleteUser(userRecord.uid);
+        } catch (rbErr) {
+          console.error("⚠️ Field operator rollback failed:", rbErr.message);
+        }
+      }
+
+      return res.status(500).json({
+        success: false,
+        message: err.message || "Failed to create field operator",
+      });
+    }
+  }
+);
+
+/* ======================================================
+   📋 LIST FIELD OPERATORS (ADMIN ONLY)
+   ====================================================== */
+router.get(
+  "/field-operators",
+  verifyToken,
+  requireAdmin,
+  async (req, res) => {
+    try {
+      const snap = await admin
+        .firestore()
+        .collection("users")
+        .where("role", "==", "field_operator")
+        .get();
+
+      const operators = snap.docs
+        .map((d) => ({ uid: d.id, ...d.data() }))
+        .sort((a, b) => {
+          const aMs = a.createdAt?.toMillis?.() || 0;
+          const bMs = b.createdAt?.toMillis?.() || 0;
+          return bMs - aMs;
+        });
+
+      return res.json({ success: true, operators });
+    } catch (err) {
+      console.error("FETCH FIELD OPERATORS ERROR:", err);
+      return res.status(500).json({
+        success: false,
+        message: "Failed to fetch field operators",
+      });
+    }
+  }
+);
+
+/* ======================================================
    🔐 RESET OPERATOR PASSWORD (ADMIN ONLY)
    ====================================================== */
 router.post(

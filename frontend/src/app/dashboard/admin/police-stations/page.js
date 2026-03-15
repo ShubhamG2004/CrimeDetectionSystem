@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import dynamic from "next/dynamic";
 import { auth } from "@/lib/firebase";
+import { ROLES } from "@/lib/roles";
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
 
@@ -46,7 +47,7 @@ export default function PoliceStationsPage() {
 
     onAuthStateChanged(auth, (user) => {
       if (!user) return router.replace("/login");
-      if (localStorage.getItem("role") !== "admin")
+      if (localStorage.getItem("role") !== ROLES.ADMIN)
         return router.replace("/dashboard");
       fetchStations();
     });

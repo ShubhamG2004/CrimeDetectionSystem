@@ -1,31 +1,37 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   collection,
   getDocs,
-  doc,
-  getDoc,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
+import { ROLES } from "@/lib/roles";
 import IncidentMap from "@/components/IncidentMap";
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
 
 export default function AdminMapPage() {
+  const router = useRouter();
   const [incidents, setIncidents] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
+        router.replace("/login");
         setLoading(false);
         return;
       }
 
-      const tokenResult = await user.getIdTokenResult(true);
-      const role = tokenResult.claims.role;
+      const role = localStorage.getItem("role");
+      if (role !== ROLES.ADMIN) {
+        router.replace("/dashboard");
+        setLoading(false);
+        return;
+      }
 
       const incidentSnap = await getDocs(collection(db, "incidents"));
       const allIncidents = incidentSnap.docs.map((d) => ({
@@ -33,59 +39,12 @@ export default function AdminMapPage() {
         ...d.data(),
       }));
 
-      if (role === "admin") {
-        setIncidents(allIncidents);
-        setLoading(false);
-        return;
-      }
-
-      const operatorSnap = await getDoc(
-        doc(db, "operators", user.uid)
-      );
-
-      if (!operatorSnap.exists()) {
-        setIncidents([]);
-        setLoading(false);
-        return;
-      }
-
-      const cameraIds = operatorSnap.data().cameras || [];
-
-      if (cameraIds.length === 0) {
-        setIncidents([]);
-        setLoading(false);
-        return;
-      }
-
-      const cameraSnaps = await Promise.all(
-        cameraIds.map((id) => getDoc(doc(db, "cameras", id)))
-      );
-
-      const cameras = cameraSnaps
-        .filter((snap) => snap.exists())
-        .map((snap) => snap.data());
-
-      const filteredIncidents = allIncidents.filter((incident) => {
-        if (!incident.location) return false;
-
-        return cameras.some((cam) => {
-          const latDiff = Math.abs(
-            incident.location.lat - cam.latitude
-          );
-          const lngDiff = Math.abs(
-            incident.location.lng - cam.longitude
-          );
-
-          return latDiff < 0.01 && lngDiff < 0.01;
-        });
-      });
-
-      setIncidents(filteredIncidents);
+      setIncidents(allIncidents);
       setLoading(false);
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [router]);
 
   if (loading) {
     return (

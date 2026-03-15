@@ -17,9 +17,17 @@ export function middleware(req) {
     return NextResponse.redirect(new URL(role ? "/dashboard" : "/login", req.url));
   }
 
+  if (url.startsWith("/analytics") && role !== "admin") {
+    return NextResponse.redirect(new URL(role ? "/dashboard" : "/login", req.url));
+  }
+
+  if (url.startsWith("/detect-image") && role !== "operator") {
+    return NextResponse.redirect(new URL(role ? "/dashboard" : "/login", req.url));
+  }
+
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/field-operator/:path*"],
+  matcher: ["/dashboard/:path*", "/field-operator/:path*", "/analytics/:path*", "/detect-image/:path*"],
 };

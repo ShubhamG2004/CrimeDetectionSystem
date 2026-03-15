@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import OperatorSidebar from "@/components/OperatorSidebar";
 import { auth } from "@/lib/firebase";
+import { ROLES } from "@/lib/roles";
 import { onAuthStateChanged } from "firebase/auth";
 
 export default function ImageDetectionPage() {
+  const router = useRouter();
   const [image, setImage] = useState(null);
   const [preview, setPreview] = useState(null);
   
@@ -31,7 +34,15 @@ export default function ImageDetectionPage() {
      ====================================================== */
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!user) return;
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
+
+      if (localStorage.getItem("role") !== ROLES.OPERATOR) {
+        router.replace("/dashboard");
+        return;
+      }
 
       try {
         const token = await user.getIdToken();
@@ -60,7 +71,7 @@ export default function ImageDetectionPage() {
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [router]);
 
   /* ================= IMAGE HANDLER ================= */
   const handleImageChange = (e) => {

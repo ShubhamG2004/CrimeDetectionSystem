@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
+import { ROLES } from "@/lib/roles";
 import {
   collection,
   getDocs,
@@ -58,8 +59,8 @@ export default function ManageOperators() {
       const tokenResult = await user.getIdTokenResult(true);
       const role = tokenResult.claims.role;
 
-      if (role !== "admin") {
-        router.replace("/dashboard/operator");
+      if (role !== ROLES.ADMIN) {
+        router.replace("/dashboard");
         return;
       }
 

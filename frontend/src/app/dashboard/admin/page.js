@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { ROLES } from "@/lib/roles";
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
 
@@ -24,8 +25,8 @@ export default function AdminDashboard() {
       }
 
       const role = localStorage.getItem("role");
-      if (role !== "admin") {
-        router.replace("/dashboard/operator");
+      if (role !== ROLES.ADMIN) {
+        router.replace("/dashboard");
       }
     });
 

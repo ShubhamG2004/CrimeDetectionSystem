@@ -13,6 +13,7 @@ import {
   serverTimestamp,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { ROLES } from "@/lib/roles";
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
 
@@ -49,7 +50,7 @@ export default function PendingCamerasPage() {
 
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) return router.replace("/login");
-      if (localStorage.getItem("role") !== "admin") return router.replace("/dashboard");
+      if (localStorage.getItem("role") !== ROLES.ADMIN) return router.replace("/dashboard");
 
       try {
         await fetchPendingCameras();

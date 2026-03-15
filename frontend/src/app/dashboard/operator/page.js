@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
+import { ROLES } from "@/lib/roles";
 import {
   collection,
   doc,
@@ -60,8 +61,8 @@ export default function OperatorDashboard() {
         return;
       }
 
-      if (localStorage.getItem("role") !== "operator") {
-        router.replace("/dashboard/admin");
+      if (localStorage.getItem("role") !== ROLES.OPERATOR) {
+        router.replace("/dashboard");
         return;
       }
 
