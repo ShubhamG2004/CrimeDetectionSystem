@@ -40,9 +40,9 @@ export default function AdminDashboard() {
       <div className="flex-1">
         <Navbar title="🛠️ Admin Control Dashboard" />
 
-        <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
           <a
-            href="/dashboard/operator"
+            href="/dashboard/admin/live-monitoring"
             className="app-card p-6 transition hover:shadow-md"
           >
             <h3 className="font-semibold text-lg text-slate-900">👮 Live Monitoring</h3>
@@ -68,6 +68,16 @@ export default function AdminDashboard() {
             <h3 className="font-semibold text-lg text-slate-900">🎥 Camera Management</h3>
             <p className="text-sm text-slate-600">
               Review pending submissions and approve active cameras
+            </p>
+          </a>
+
+          <a
+            href="/dashboard/admin/field-operators"
+            className="app-card p-6 transition hover:shadow-md"
+          >
+            <h3 className="font-semibold text-lg text-slate-900">🧑‍🔧 Field Operators</h3>
+            <p className="text-sm text-slate-600">
+              Create and manage camera installation staff
             </p>
           </a>
         </div>

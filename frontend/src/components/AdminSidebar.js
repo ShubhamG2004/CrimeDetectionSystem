@@ -16,21 +16,24 @@ import {
 export default function AdminSidebar() {
   const pathname = usePathname();
 
-  // Better active detection (supports nested routes)
-  const isActive = (href) => pathname.startsWith(href);
+  // Keep overview active only on its exact route; other items support nested routes.
+  const isActive = (href) =>
+    href === "/dashboard/admin"
+      ? pathname === href
+      : pathname.startsWith(href);
 
   const navItemClass = (active) =>
     `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
       active
-        ? "bg-gradient-to-r from-slate-950 to-slate-800 text-white shadow-[0_8px_24px_rgba(0,0,0,0.15)]"
-        : "text-slate-700 font-medium hover:bg-gradient-to-r hover:from-slate-50 hover:to-white"
+        ? "bg-gradient-to-r from-blue-900 to-blue-700 text-white"
+        : "text-gray-600 font-medium hover:bg-gray-100"
     }`;
 
   const iconClass = (active) =>
-    active ? "h-5 w-5 text-white" : "h-5 w-5 text-slate-600";
+    active ? "h-5 w-5 text-white" : "h-5 w-5 text-gray-600";
 
   const labelClass = (active) =>
-    active ? "text-white" : "text-slate-700";
+    active ? "text-white" : "text-gray-600";
 
   return (
     <aside className="w-64 h-screen bg-white border-r border-gray-200 px-4 py-6 flex flex-col justify-between">
@@ -67,54 +70,34 @@ export default function AdminSidebar() {
           </Link>
 
           <Link
-            href="/dashboard/operator"
-            className={navItemClass(isActive("/dashboard/operator"))}
+            href="/dashboard/admin/live-monitoring"
+            className={navItemClass(isActive("/dashboard/admin/live-monitoring"))}
           >
             <Radio
-              className={iconClass(isActive("/dashboard/operator"))}
+              className={iconClass(isActive("/dashboard/admin/live-monitoring"))}
             />
-            <span className={labelClass(isActive("/dashboard/operator"))}>
+            <span className={labelClass(isActive("/dashboard/admin/live-monitoring"))}>
               Live Monitoring
             </span>
           </Link>
 
           <Link
-            href="/analytics"
+            href="/dashboard/admin/field-operators"
             className={navItemClass(
-              isActive("/analytics")
+              isActive("/dashboard/admin/field-operators")
             )}
           >
-            <BarChart3
+            <Users
               className={iconClass(
-                isActive("/analytics")
+                isActive("/dashboard/admin/field-operators")
               )}
             />
             <span
               className={labelClass(
-                isActive("/analytics")
+                isActive("/dashboard/admin/field-operators")
               )}
             >
-              Analytics
-            </span>
-          </Link>
-
-          <Link
-            href="/dashboard/admin/cameras"
-            className={navItemClass(
-              isActive("/dashboard/admin/cameras")
-            )}
-          >
-            <Video
-              className={iconClass(
-                isActive("/dashboard/admin/cameras")
-              )}
-            />
-            <span
-              className={labelClass(
-                isActive("/dashboard/admin/cameras")
-              )}
-            >
-              Manage Cameras
+              Field Operators
             </span>
           </Link>
 
@@ -139,6 +122,56 @@ export default function AdminSidebar() {
           </Link>
 
           <Link
+            href="/dashboard/admin/police-stations"
+            className={navItemClass(isActive("/dashboard/admin/police-stations"))}
+          >
+            <Building2 className={iconClass(isActive("/dashboard/admin/police-stations"))} />
+            <span className={labelClass(isActive("/dashboard/admin/police-stations"))}>
+              Police Stations
+            </span>
+          </Link>
+
+          <Link
+            href="/dashboard/admin/cameras"
+            className={navItemClass(
+              isActive("/dashboard/admin/cameras")
+            )}
+          >
+            <Video
+              className={iconClass(
+                isActive("/dashboard/admin/cameras")
+              )}
+            />
+            <span
+              className={labelClass(
+                isActive("/dashboard/admin/cameras")
+              )}
+            >
+              Manage Cameras
+            </span>
+          </Link>
+
+          <Link
+            href="/analytics"
+            className={navItemClass(
+              isActive("/analytics")
+            )}
+          >
+            <BarChart3
+              className={iconClass(
+                isActive("/analytics")
+              )}
+            />
+            <span
+              className={labelClass(
+                isActive("/analytics")
+              )}
+            >
+              Analytics
+            </span>
+          </Link>
+
+          <Link
             href="/dashboard/admin/operator-logs"
             className={navItemClass(
               isActive("/dashboard/admin/operator-logs")
@@ -155,16 +188,6 @@ export default function AdminSidebar() {
               )}
             >
               Operator Logs
-            </span>
-          </Link>
-
-          <Link
-            href="/dashboard/admin/police-stations"
-            className={navItemClass(isActive("/dashboard/admin/police-stations"))}
-          >
-            <Building2 className={iconClass(isActive("/dashboard/admin/police-stations"))} />
-            <span className={labelClass(isActive("/dashboard/admin/police-stations"))}>
-              Police Stations
             </span>
           </Link>
         </nav>

@@ -110,9 +110,8 @@ export default function PendingCamerasPage() {
                 <tr>
                   <th className="p-3 text-left">Camera Name</th>
                   <th className="p-3 text-left">Location</th>
-                  <th className="p-3 text-left">Police Station</th>
                   <th className="p-3 text-center">IP Address</th>
-                  <th className="p-3 text-center">Added By</th>
+                  <th className="p-3 text-center">Field Operator</th>
                   <th className="p-3 text-center">Action</th>
                 </tr>
               </thead>
@@ -122,7 +121,6 @@ export default function PendingCamerasPage() {
                   <tr key={cam.id} className="border-t border-slate-100 hover:bg-slate-50/70">
                     <td className="p-3 font-medium">{cam.cameraName || cam.name}</td>
                     <td className="p-3">{cam.location || cam.area || "-"}</td>
-                    <td className="p-3">{cam.policeStationName || "-"}</td>
                     <td className="p-3 text-center">{cam.ipAddress || "-"}</td>
                     <td className="p-3 text-center">{cam.addedBy || "-"}</td>
                     <td className="p-3 text-center space-x-2">

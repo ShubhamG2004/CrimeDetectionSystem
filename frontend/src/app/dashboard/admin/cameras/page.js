@@ -100,7 +100,7 @@ export default function CameraApprovalOverview() {
                 <tr>
                   <th className="p-3 text-left">Name</th>
                   <th className="p-3 text-left">Location</th>
-                  <th className="p-3 text-left">Police Station</th>
+                  <th className="p-3 text-left">Field Operator</th>
                   <th className="p-3 text-center">Lat</th>
                   <th className="p-3 text-center">Lng</th>
                 </tr>
@@ -116,7 +116,7 @@ export default function CameraApprovalOverview() {
                       {cam.cameraName || cam.name}
                     </td>
                     <td className="p-3">{cam.location || cam.area || "-"}</td>
-                    <td className="p-3">{cam.policeStationName || "-"}</td>
+                    <td className="p-3">{cam.addedBy || "-"}</td>
                     <td className="p-3 text-center">{cam.latitude ?? "-"}</td>
                     <td className="p-3 text-center">{cam.longitude ?? "-"}</td>
                   </tr>
