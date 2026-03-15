@@ -14,6 +14,7 @@ export default function LogoutButton() {
 
       // 🧹 Clear stored role
       localStorage.removeItem("role");
+      document.cookie = "role=; path=/; max-age=0; SameSite=Lax";
 
       // 🔁 Redirect to login
       router.push("/login");
