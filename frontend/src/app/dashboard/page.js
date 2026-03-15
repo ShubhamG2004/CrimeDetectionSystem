@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { getDefaultRouteByRole } from "@/lib/roles";
 
 export default function DashboardRouter() {
   const router = useRouter();
@@ -16,12 +17,7 @@ export default function DashboardRouter() {
       }
 
       const role = localStorage.getItem("role");
-
-      if (role === "admin") {
-        router.replace("/dashboard/admin");
-      } else {
-        router.replace("/dashboard/operator");
-      }
+      router.replace(getDefaultRouteByRole(role));
     });
 
     return () => unsub();

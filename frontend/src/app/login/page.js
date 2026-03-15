@@ -6,13 +6,14 @@ import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import { Shield, User, Lock, Mail } from "lucide-react";
+import { ROLES, getDefaultRouteByRole } from "@/lib/roles";
 
 export default function Login() {
   const router = useRouter();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [loginType, setLoginType] = useState("admin");
+  const [loginType, setLoginType] = useState(ROLES.ADMIN);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -36,23 +37,28 @@ export default function Login() {
       }
 
       if (loginType !== role) {
-        setError(
-          role === "admin"
-            ? "Please login as Admin"
-            : "Please login as Operator"
-        );
+        const roleLabel =
+          role === ROLES.ADMIN
+            ? "Admin"
+            : role === ROLES.FIELD_OPERATOR
+              ? "Field Operator"
+              : "Operator";
+
+        setError(`Please login as ${roleLabel}`);
         await auth.signOut();
         return;
       }
 
-      const collectionName = role === "operator" ? "operators" : "users";
+      const collectionName = role === ROLES.OPERATOR ? "operators" : "users";
       const profileSnap = await getDoc(doc(db, collectionName, uid));
 
       if (!profileSnap.exists()) {
         setError(
-          role === "operator"
+          role === ROLES.OPERATOR
             ? "Operator profile not found"
-            : "Admin profile not found"
+            : role === ROLES.FIELD_OPERATOR
+              ? "Field operator profile not found"
+              : "Admin profile not found"
         );
         await auth.signOut();
         return;
@@ -60,12 +66,9 @@ export default function Login() {
 
       localStorage.setItem("role", role);
       localStorage.setItem("uid", uid);
+      document.cookie = `role=${role}; path=/; max-age=86400; SameSite=Lax`;
 
-      if (role === "admin") {
-        router.replace("/dashboard/admin");
-      } else {
-        router.replace("/dashboard/operator");
-      }
+      router.replace(getDefaultRouteByRole(role));
     } catch (err) {
       console.error("LOGIN ERROR:", err);
       setError("Invalid email or password");
@@ -89,9 +92,9 @@ export default function Login() {
                 <div className="flex bg-slate-100/80 rounded-lg p-1 text-slate-700">
                   <button
                     type="button"
-                    onClick={() => setLoginType("admin")}
+                    onClick={() => setLoginType(ROLES.ADMIN)}
                     className={`flex-1 py-3 px-4 rounded-md flex items-center justify-center space-x-2 transition-all ${
-                      loginType === "admin"
+                      loginType === ROLES.ADMIN
                         ? "bg-white shadow text-slate-900"
                         : "hover:bg-white/70"
                     }`}
@@ -101,15 +104,27 @@ export default function Login() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setLoginType("operator")}
+                    onClick={() => setLoginType(ROLES.OPERATOR)}
                     className={`flex-1 py-3 px-4 rounded-md flex items-center justify-center space-x-2 transition-all ${
-                      loginType === "operator"
+                      loginType === ROLES.OPERATOR
                         ? "bg-white shadow text-slate-900"
                         : "hover:bg-white/70"
                     }`}
                   >
                     <User className="w-4 h-4" />
                     <span>Operator</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setLoginType(ROLES.FIELD_OPERATOR)}
+                    className={`flex-1 py-3 px-4 rounded-md flex items-center justify-center space-x-2 transition-all ${
+                      loginType === ROLES.FIELD_OPERATOR
+                        ? "bg-white shadow text-slate-900"
+                        : "hover:bg-white/70"
+                    }`}
+                  >
+                    <User className="w-4 h-4" />
+                    <span>Field Operator</span>
                   </button>
                 </div>
               </div>
