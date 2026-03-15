@@ -298,7 +298,7 @@ export default function PoliceStationsPage() {
         {/* ─── MODAL ─── */}
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="app-card w-full max-w-lg max-h-[90vh] overflow-y-auto p-6">
+            <div className="app-card w-full max-w-2xl max-h-[92vh] overflow-y-auto p-6">
               <h3 className="font-semibold text-lg text-slate-800 mb-4">
                 {editingId ? "Edit Police Station" : "Add Police Station"}
               </h3>
@@ -325,27 +325,110 @@ export default function PoliceStationsPage() {
                 </div>
               </div>
 
-              {/* ── MAP PICKER ── */}
-              <p className="text-xs font-medium text-slate-600 mb-1 mt-1">
-                📍 Click on the map to set station location
-              </p>
-              <LocationPickerMap
-                value={pinLocation}
-                onChange={setPinLocation}
-                height="220px"
-              />
-              {pinLocation && (
-                <p className="text-xs text-emerald-600 mt-1">
-                  ✅ {pinLocation.lat}, {pinLocation.lng}
-                </p>
-              )}
-              {!pinLocation && (
-                <p className="text-xs text-slate-400 mt-1">
-                  No location pinned yet
-                </p>
-              )}
+              {/* ── LOCATION SECTION ── */}
+              <div className="mt-3 border border-slate-200 rounded-xl p-4 bg-slate-50">
+                <div className="flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-slate-700">
+                    📍 Station Location
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!navigator.geolocation) {
+                        alert("Geolocation is not supported by your browser.");
+                        return;
+                      }
+                      navigator.geolocation.getCurrentPosition(
+                        (pos) =>
+                          setPinLocation({
+                            lat: parseFloat(pos.coords.latitude.toFixed(6)),
+                            lng: parseFloat(pos.coords.longitude.toFixed(6)),
+                          }),
+                        () => alert("Unable to retrieve your location.")
+                      );
+                    }}
+                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg"
+                  >
+                    🎯 Use My Location
+                  </button>
+                </div>
 
-              <div className="flex justify-end gap-2 mt-2">
+                {/* Manual lat / lng inputs */}
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Latitude
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="e.g. 12.971599"
+                      className="app-input w-full"
+                      value={pinLocation?.lat ?? ""}
+                      onChange={(e) => {
+                        const lat = parseFloat(e.target.value);
+                        if (!isNaN(lat)) {
+                          setPinLocation((prev) => ({
+                            lat: parseFloat(lat.toFixed(6)),
+                            lng: prev?.lng ?? 78.9629,
+                          }));
+                        }
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-600 mb-1">
+                      Longitude
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      placeholder="e.g. 77.594563"
+                      className="app-input w-full"
+                      value={pinLocation?.lng ?? ""}
+                      onChange={(e) => {
+                        const lng = parseFloat(e.target.value);
+                        if (!isNaN(lng)) {
+                          setPinLocation((prev) => ({
+                            lat: prev?.lat ?? 20.5937,
+                            lng: parseFloat(lng.toFixed(6)),
+                          }));
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+
+                {/* Map */}
+                <p className="text-xs text-slate-500 mb-2">
+                  Or click anywhere on the map to pin the location
+                </p>
+                <LocationPickerMap
+                  value={pinLocation}
+                  onChange={setPinLocation}
+                  height="300px"
+                />
+
+                {/* Status */}
+                <div className="mt-2 text-xs">
+                  {pinLocation ? (
+                    <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
+                      ✅ Pinned at {pinLocation.lat}, {pinLocation.lng}
+                      <button
+                        type="button"
+                        onClick={() => setPinLocation(null)}
+                        className="ml-2 text-slate-400 hover:text-rose-500 underline"
+                      >
+                        Clear
+                      </button>
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">No location pinned yet</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-4">
                 <button
                   onClick={closeModal}
                   className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700 text-sm"

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { MapContainer, TileLayer, Marker, useMapEvents } from "react-leaflet";
+import { useEffect, useRef } from "react";
+import { MapContainer, TileLayer, Marker, useMapEvents, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import L from "leaflet";
 
@@ -29,12 +29,34 @@ function ClickHandler({ onPick }) {
   return null;
 }
 
+/* ── Fly to new value when it changes externally (e.g. manual input) ── */
+function FlyToMarker({ value }) {
+  const map = useMap();
+  const prevRef = useRef(null);
+
+  useEffect(() => {
+    if (!value) return;
+    const prev = prevRef.current;
+    const changed =
+      !prev || prev.lat !== value.lat || prev.lng !== value.lng;
+    if (changed) {
+      map.flyTo([value.lat, value.lng], Math.max(map.getZoom(), 13), {
+        animate: true,
+        duration: 0.8,
+      });
+      prevRef.current = value;
+    }
+  }, [value, map]);
+
+  return null;
+}
+
 /**
  * LocationPickerMap
  * Props:
- *   value   – { lat, lng } | null  — current pin position
- *   onChange – fn({ lat, lng })    — called on map click
- *   height  – CSS string (default "300px")
+ *   value    – { lat, lng } | null  — current pin position
+ *   onChange – fn({ lat, lng })     — called on map click
+ *   height   – CSS string (default "300px")
  */
 export default function LocationPickerMap({
   value,
@@ -54,13 +76,14 @@ export default function LocationPickerMap({
         center={center}
         zoom={value ? 14 : 5}
         style={{ height: "100%", width: "100%" }}
-        zoomControl={false}
+        zoomControl={true}
       >
         <TileLayer
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
         />
         <ClickHandler onPick={onChange} />
+        <FlyToMarker value={value} />
         {value && (
           <Marker position={[value.lat, value.lng]} icon={pinIcon} />
         )}
