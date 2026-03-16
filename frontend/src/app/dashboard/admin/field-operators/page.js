@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import { doc, updateDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { ROLES } from "@/lib/roles";
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
@@ -17,6 +18,12 @@ export default function FieldOperatorsPage() {
   const [operators, setOperators] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUid, setEditingUid] = useState(null);
+  const [editName, setEditName] = useState("");
+  const [resetUid, setResetUid] = useState(null);
+  const [newPassword, setNewPassword] = useState("");
 
   const [form, setForm] = useState({
     name: "",
@@ -102,6 +109,87 @@ export default function FieldOperatorsPage() {
     }
   };
 
+  const openEditModal = (op) => {
+    setEditingUid(op.uid);
+    setEditName(op.name || "");
+    setShowEditModal(true);
+  };
+
+  const closeEditModal = () => {
+    setShowEditModal(false);
+    setEditingUid(null);
+    setEditName("");
+  };
+
+  const saveEdit = async () => {
+    if (!editingUid || !editName.trim()) {
+      alert("Name is required");
+      return;
+    }
+
+    try {
+      await updateDoc(doc(db, "users", editingUid), {
+        name: editName.trim(),
+        updatedAt: new Date(),
+      });
+
+      closeEditModal();
+      await fetchFieldOperators();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to update field operator");
+    }
+  };
+
+  const toggleStatus = async (uid, currentStatus) => {
+    try {
+      await updateDoc(doc(db, "users", uid), {
+        status: currentStatus === "active" ? "inactive" : "active",
+        updatedAt: new Date(),
+      });
+
+      await fetchFieldOperators();
+    } catch (error) {
+      console.error(error);
+      alert("Failed to update status");
+    }
+  };
+
+  const resetPassword = async () => {
+    if (!resetUid || !newPassword || newPassword.length < 6) {
+      alert("Password must be at least 6 characters");
+      return;
+    }
+
+    try {
+      const token = await auth.currentUser.getIdToken();
+      const res = await fetch(`${API}/reset-operator-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          uid: resetUid,
+          newPassword,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.message || "Failed to reset password");
+        return;
+      }
+
+      alert("Password reset successfully");
+      setResetUid(null);
+      setNewPassword("");
+    } catch (error) {
+      console.error(error);
+      alert("Failed to reset password");
+    }
+  };
+
   return (
     <div className="app-shell flex">
       <AdminSidebar />
@@ -157,6 +245,7 @@ export default function FieldOperatorsPage() {
                   <th className="p-3 text-left">Email</th>
                   <th className="p-3 text-center">Role</th>
                   <th className="p-3 text-center">Status</th>
+                  <th className="p-3 text-center">Action</th>
                 </tr>
               </thead>
 
@@ -167,9 +256,44 @@ export default function FieldOperatorsPage() {
                     <td className="p-3">{op.email}</td>
                     <td className="p-3 text-center">{op.role || "field_operator"}</td>
                     <td className="p-3 text-center">
-                      <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-700">
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          (op.status || "active") === "active"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : "bg-rose-100 text-rose-700"
+                        }`}
+                      >
                         {(op.status || "active").toUpperCase()}
                       </span>
+                    </td>
+                    <td className="p-3 text-center space-x-2">
+                      <button
+                        onClick={() => openEditModal(op)}
+                        className="px-3 py-1 bg-slate-900 text-white text-xs rounded"
+                      >
+                        Edit
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setResetUid(op.uid);
+                          setNewPassword("");
+                        }}
+                        className="px-3 py-1 bg-amber-600 text-white text-xs rounded"
+                      >
+                        Change Password
+                      </button>
+
+                      <button
+                        onClick={() => toggleStatus(op.uid, op.status || "active")}
+                        className={`px-3 py-1 text-white text-xs rounded ${
+                          (op.status || "active") === "active"
+                            ? "bg-rose-600"
+                            : "bg-emerald-600"
+                        }`}
+                      >
+                        {(op.status || "active") === "active" ? "Disable" : "Enable"}
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -182,6 +306,73 @@ export default function FieldOperatorsPage() {
             )}
           </div>
         </div>
+
+        {showEditModal && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="app-card w-105 p-6">
+              <h3 className="font-semibold text-lg mb-4 text-slate-800">Edit Field Operator</h3>
+
+              <div className="space-y-3">
+                <label className="block text-sm font-medium text-slate-700">Full Name</label>
+                <input
+                  className="app-input"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  placeholder="Enter full name"
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  onClick={closeEditModal}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={saveEdit}
+                  className="px-4 py-2 bg-slate-900 text-white rounded-lg"
+                >
+                  Save
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {resetUid && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="app-card w-95 p-6">
+              <h3 className="font-semibold text-lg mb-4 text-slate-800">Change Password</h3>
+
+              <input
+                type="password"
+                className="app-input mb-4"
+                placeholder="New Password (min 6 chars)"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+              />
+
+              <div className="flex justify-end gap-2">
+                <button
+                  onClick={() => {
+                    setResetUid(null);
+                    setNewPassword("");
+                  }}
+                  className="px-4 py-2 border border-slate-300 rounded-lg text-slate-700"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={resetPassword}
+                  className="px-4 py-2 bg-amber-600 text-white rounded-lg"
+                >
+                  Update Password
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
