@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Camera, ListChecks, LayoutDashboard, Shield } from "lucide-react";
+import { Camera, ListChecks, LayoutDashboard, Shield, UserCircle2 } from "lucide-react";
 import LogoutButton from "./LogoutButton";
 
 export default function FieldOperatorSidebar() {
@@ -59,6 +59,14 @@ export default function FieldOperatorSidebar() {
           >
             <ListChecks className={iconClass(isActive("/field-operator/my-cameras"))} />
             <span className={labelClass(isActive("/field-operator/my-cameras"))}>My Cameras</span>
+          </Link>
+
+          <Link
+            href="/field-operator/profile"
+            className={navItemClass(isActive("/field-operator/profile"))}
+          >
+            <UserCircle2 className={iconClass(isActive("/field-operator/profile"))} />
+            <span className={labelClass(isActive("/field-operator/profile"))}>Profile</span>
           </Link>
         </nav>
       </div>
