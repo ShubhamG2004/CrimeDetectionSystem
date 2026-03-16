@@ -76,6 +76,8 @@ export default function Login() {
       if (role === ROLES.OPERATOR) {
         profileSnap = await getDoc(doc(db, "operators", uid));
       } else if (role === ROLES.FIELD_OPERATOR) {
+        let usedFallback = false;
+
         try {
           profileSnap = await getDoc(doc(db, "field_operator", uid));
         } catch (fieldOpErr) {
@@ -83,6 +85,7 @@ export default function Login() {
           if ((fieldOpErr?.code || "").includes("permission-denied")) {
             try {
               profileSnap = await getDoc(doc(db, "users", uid));
+              usedFallback = true;
             } catch (usersErr) {
               if ((usersErr?.code || "").includes("permission-denied")) {
                 profileReadBlocked = true;
@@ -93,6 +96,11 @@ export default function Login() {
           } else {
             throw fieldOpErr;
           }
+        }
+
+        if (!profileReadBlocked && !usedFallback && !profileSnap?.exists()) {
+          // If account has not been migrated yet, check legacy users collection.
+          profileSnap = await getDoc(doc(db, "users", uid));
         }
       } else {
         profileSnap = await getDoc(doc(db, "users", uid));

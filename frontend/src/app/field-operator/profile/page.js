@@ -28,6 +28,7 @@ export default function FieldOperatorProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState("");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -42,8 +43,15 @@ export default function FieldOperatorProfilePage() {
         return;
       }
 
+      setProfileError("");
+
+      const fallbackCreatedAt = user?.metadata?.creationTime
+        ? new Date(user.metadata.creationTime)
+        : null;
+
       try {
         let snap;
+        let usedFallback = false;
 
         try {
           snap = await getDoc(doc(db, "field_operator", user.uid));
@@ -51,9 +59,15 @@ export default function FieldOperatorProfilePage() {
           // Backward-compatibility while some environments still enforce old users-based rules.
           if (fieldOpErr?.code === "permission-denied") {
             snap = await getDoc(doc(db, "users", user.uid));
+            usedFallback = true;
           } else {
             throw fieldOpErr;
           }
+        }
+
+        if (!snap.exists() && !usedFallback) {
+          // If not migrated yet, read legacy profile location.
+          snap = await getDoc(doc(db, "users", user.uid));
         }
 
         if (!snap.exists()) {
@@ -61,9 +75,50 @@ export default function FieldOperatorProfilePage() {
           return;
         }
 
-        setProfile({ uid: snap.id, ...snap.data() });
+        const data = snap.data();
+        setProfile({
+          uid: snap.id,
+          ...data,
+          createdAt: data?.createdAt || fallbackCreatedAt,
+          createdBy: data?.createdBy || "system",
+        });
       } catch (error) {
         console.error("Failed to load field operator profile:", error);
+
+        const code = error?.code || "";
+        const message = (error?.message || "").toLowerCase();
+        const isPermissionDenied = code.includes("permission-denied") || message.includes("missing or insufficient permissions");
+        const isOffline =
+          code.includes("unavailable") ||
+          code.includes("failed-precondition") ||
+          message.includes("offline") ||
+          message.includes("could not reach cloud firestore backend");
+
+        if (isPermissionDenied) {
+          setProfileError("Profile access is limited by Firestore permissions. Showing basic account data.");
+          setProfile({
+            uid: user.uid,
+            name: user.displayName || "-",
+            email: user.email || "-",
+            role: ROLES.FIELD_OPERATOR,
+            status: "active",
+            createdAt: fallbackCreatedAt,
+            createdBy: "system",
+          });
+        } else if (isOffline) {
+          setProfileError("You are offline. Showing limited profile data.");
+          setProfile({
+            uid: user.uid,
+            name: user.displayName || "-",
+            email: user.email || "-",
+            role: ROLES.FIELD_OPERATOR,
+            status: "active",
+            createdAt: fallbackCreatedAt,
+            createdBy: "system",
+          });
+        } else {
+          setProfileError("Unable to load profile right now. Please try again.");
+        }
       } finally {
         setLoading(false);
       }
@@ -80,10 +135,18 @@ export default function FieldOperatorProfilePage() {
         <Navbar title="Field Operator Profile" />
 
         <div className="p-6 space-y-5">
+          {profileError && (
+            <div className="app-card p-4 border-l-4 border-amber-400 text-amber-800">
+              {profileError}
+            </div>
+          )}
+
           {loading ? (
             <div className="app-card p-6 text-slate-600">Loading profile...</div>
-          ) : !profile ? (
+          ) : !profile && !profileError ? (
             <div className="app-card p-6 text-rose-700">Profile not found.</div>
+          ) : !profile && profileError ? (
+            <div className="app-card p-6 text-slate-700">Please try again when your connection is stable.</div>
           ) : (
             <div className="app-card p-6">
               <h2 className="text-xl font-semibold text-slate-900">Account Details</h2>
