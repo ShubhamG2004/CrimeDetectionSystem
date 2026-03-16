@@ -43,7 +43,19 @@ export default function FieldOperatorProfilePage() {
       }
 
       try {
-        const snap = await getDoc(doc(db, "field_operator", user.uid));
+        let snap;
+
+        try {
+          snap = await getDoc(doc(db, "field_operator", user.uid));
+        } catch (fieldOpErr) {
+          // Backward-compatibility while some environments still enforce old users-based rules.
+          if (fieldOpErr?.code === "permission-denied") {
+            snap = await getDoc(doc(db, "users", user.uid));
+          } else {
+            throw fieldOpErr;
+          }
+        }
+
         if (!snap.exists()) {
           router.replace("/field-operator");
           return;

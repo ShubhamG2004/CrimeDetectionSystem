@@ -70,15 +70,35 @@ export default function Login() {
         return;
       }
 
-      const collectionName =
-        role === ROLES.OPERATOR
-          ? "operators"
-          : role === ROLES.FIELD_OPERATOR
-            ? "field_operator"
-            : "users";
-      const profileSnap = await getDoc(doc(db, collectionName, uid));
+      let profileSnap;
+      let profileReadBlocked = false;
 
-      if (!profileSnap.exists()) {
+      if (role === ROLES.OPERATOR) {
+        profileSnap = await getDoc(doc(db, "operators", uid));
+      } else if (role === ROLES.FIELD_OPERATOR) {
+        try {
+          profileSnap = await getDoc(doc(db, "field_operator", uid));
+        } catch (fieldOpErr) {
+          // Backward-compatibility while some environments still enforce old users-based rules.
+          if ((fieldOpErr?.code || "").includes("permission-denied")) {
+            try {
+              profileSnap = await getDoc(doc(db, "users", uid));
+            } catch (usersErr) {
+              if ((usersErr?.code || "").includes("permission-denied")) {
+                profileReadBlocked = true;
+              } else {
+                throw usersErr;
+              }
+            }
+          } else {
+            throw fieldOpErr;
+          }
+        }
+      } else {
+        profileSnap = await getDoc(doc(db, "users", uid));
+      }
+
+      if (!profileReadBlocked && !profileSnap?.exists()) {
         setError(
           role === ROLES.OPERATOR
             ? "Operator profile not found"
