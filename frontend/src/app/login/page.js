@@ -97,7 +97,16 @@ export default function Login() {
       router.replace(getDefaultRouteByRole(role));
     } catch (err) {
       console.error("LOGIN ERROR:", err);
-      setError("Invalid email or password");
+
+      if (err?.code === "auth/invalid-credential") {
+        setError("Invalid email or password");
+      } else if (err?.code === "permission-denied") {
+        setError("Profile access denied. Please contact admin to verify Firestore rules.");
+      } else if (err?.code === "unavailable") {
+        setError("Service temporarily unavailable. Please try again.");
+      } else {
+        setError(err?.message || "Login failed. Please try again.");
+      }
     } finally {
       setLoading(false);
     }
