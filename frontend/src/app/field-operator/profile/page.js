@@ -80,7 +80,7 @@ export default function FieldOperatorProfilePage() {
           uid: snap.id,
           ...data,
           createdAt: data?.createdAt || fallbackCreatedAt,
-          createdBy: data?.createdBy || "system",
+          createdBy: data?.createdByName || data?.createdBy || "system",
         });
       } catch (error) {
         console.error("Failed to load field operator profile:", error);
@@ -174,10 +174,6 @@ export default function FieldOperatorProfilePage() {
                 <div>
                   <p className="text-slate-500">Created By</p>
                   <p className="mt-1 text-slate-900 font-medium break-all">{profile.createdBy || "-"}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <p className="text-slate-500">User ID</p>
-                  <p className="mt-1 text-slate-900 font-medium break-all">{profile.uid}</p>
                 </div>
               </div>
             </div>

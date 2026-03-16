@@ -158,6 +158,19 @@ router.post(
 
       const uid = userRecord.uid;
 
+      const creatorSnap = await admin
+        .firestore()
+        .collection("users")
+        .doc(req.user.uid)
+        .get();
+
+      const creatorData = creatorSnap.exists ? creatorSnap.data() : null;
+      const creatorName =
+        creatorData?.name ||
+        creatorData?.displayName ||
+        req.user.email ||
+        req.user.uid;
+
       await admin.auth().setCustomUserClaims(uid, {
         role: "field_operator",
       });
@@ -169,6 +182,7 @@ router.post(
         status: "active",
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         createdBy: req.user.uid,
+        createdByName: creatorName,
       });
 
       await logOperatorActivity({
