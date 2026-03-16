@@ -6,8 +6,7 @@ service cloud.firestore {
     }
 
     function hasRole(role) {
-      return isSignedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == role;
+      return isSignedIn() && request.auth.token.role == role;
     }
 
     function isAdmin() {
@@ -26,6 +25,11 @@ service cloud.firestore {
       allow read: if isSignedIn() && request.auth.uid == userId;
       allow create: if isAdmin();
       allow update, delete: if isAdmin();
+    }
+
+    match /field_operator/{operatorId} {
+      allow read: if isSignedIn() && (isAdmin() || request.auth.uid == operatorId);
+      allow create, update, delete: if isAdmin();
     }
 
     match /operators/{operatorId} {

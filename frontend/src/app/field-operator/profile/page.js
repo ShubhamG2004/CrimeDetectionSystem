@@ -43,7 +43,7 @@ export default function FieldOperatorProfilePage() {
       }
 
       try {
-        const snap = await getDoc(doc(db, "users", user.uid));
+        const snap = await getDoc(doc(db, "field_operator", user.uid));
         if (!snap.exists()) {
           router.replace("/field-operator");
           return;

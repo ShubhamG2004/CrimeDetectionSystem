@@ -70,7 +70,12 @@ export default function Login() {
         return;
       }
 
-      const collectionName = role === ROLES.OPERATOR ? "operators" : "users";
+      const collectionName =
+        role === ROLES.OPERATOR
+          ? "operators"
+          : role === ROLES.FIELD_OPERATOR
+            ? "field_operator"
+            : "users";
       const profileSnap = await getDoc(doc(db, collectionName, uid));
 
       if (!profileSnap.exists()) {

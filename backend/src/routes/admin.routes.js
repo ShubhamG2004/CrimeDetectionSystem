@@ -162,7 +162,7 @@ router.post(
         role: "field_operator",
       });
 
-      await admin.firestore().collection("users").doc(uid).set({
+      await admin.firestore().collection("field_operator").doc(uid).set({
         name,
         email,
         role: "field_operator",
@@ -214,8 +214,7 @@ router.get(
     try {
       const snap = await admin
         .firestore()
-        .collection("users")
-        .where("role", "==", "field_operator")
+        .collection("field_operator")
         .get();
 
       const operators = snap.docs

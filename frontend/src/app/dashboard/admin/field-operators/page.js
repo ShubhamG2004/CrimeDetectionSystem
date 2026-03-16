@@ -128,7 +128,7 @@ export default function FieldOperatorsPage() {
     }
 
     try {
-      await updateDoc(doc(db, "users", editingUid), {
+      await updateDoc(doc(db, "field_operator", editingUid), {
         name: editName.trim(),
         updatedAt: new Date(),
       });
@@ -143,7 +143,7 @@ export default function FieldOperatorsPage() {
 
   const toggleStatus = async (uid, currentStatus) => {
     try {
-      await updateDoc(doc(db, "users", uid), {
+      await updateDoc(doc(db, "field_operator", uid), {
         status: currentStatus === "active" ? "inactive" : "active",
         updatedAt: new Date(),
       });
