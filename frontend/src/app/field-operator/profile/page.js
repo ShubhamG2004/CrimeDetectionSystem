@@ -28,7 +28,6 @@ export default function FieldOperatorProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [profileError, setProfileError] = useState("");
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -42,8 +41,6 @@ export default function FieldOperatorProfilePage() {
         router.replace("/dashboard");
         return;
       }
-
-      setProfileError("");
 
       const fallbackCreatedAt = user?.metadata?.creationTime
         ? new Date(user.metadata.creationTime)
@@ -95,7 +92,6 @@ export default function FieldOperatorProfilePage() {
           message.includes("could not reach cloud firestore backend");
 
         if (isPermissionDenied) {
-          setProfileError("Profile access is limited by Firestore permissions. Showing basic account data.");
           setProfile({
             uid: user.uid,
             name: user.displayName || "-",
@@ -106,7 +102,6 @@ export default function FieldOperatorProfilePage() {
             createdBy: "system",
           });
         } else if (isOffline) {
-          setProfileError("You are offline. Showing limited profile data.");
           setProfile({
             uid: user.uid,
             name: user.displayName || "-",
@@ -117,7 +112,7 @@ export default function FieldOperatorProfilePage() {
             createdBy: "system",
           });
         } else {
-          setProfileError("Unable to load profile right now. Please try again.");
+          setProfile(null);
         }
       } finally {
         setLoading(false);
@@ -135,18 +130,10 @@ export default function FieldOperatorProfilePage() {
         <Navbar title="Field Operator Profile" />
 
         <div className="p-6 space-y-5">
-          {profileError && (
-            <div className="app-card p-4 border-l-4 border-amber-400 text-amber-800">
-              {profileError}
-            </div>
-          )}
-
           {loading ? (
             <div className="app-card p-6 text-slate-600">Loading profile...</div>
-          ) : !profile && !profileError ? (
+          ) : !profile ? (
             <div className="app-card p-6 text-rose-700">Profile not found.</div>
-          ) : !profile && profileError ? (
-            <div className="app-card p-6 text-slate-700">Please try again when your connection is stable.</div>
           ) : (
             <div className="app-card p-6">
               <h2 className="text-xl font-semibold text-slate-900">Account Details</h2>
