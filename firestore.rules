@@ -17,6 +17,17 @@ service cloud.firestore {
       return hasRole('field_operator');
     }
 
+    function fieldOperatorDoc() {
+      return get(/databases/$(database)/documents/field_operator/$(request.auth.uid));
+    }
+
+    function isFieldOperatorAccount() {
+      return isSignedIn() &&
+        fieldOperatorDoc().exists() &&
+        (fieldOperatorDoc().data.role == 'field_operator' || fieldOperatorDoc().data.role == null) &&
+        (fieldOperatorDoc().data.status == 'active' || fieldOperatorDoc().data.status == null);
+    }
+
     function isOperator() {
       return hasRole('operator');
     }
@@ -84,8 +95,9 @@ service cloud.firestore {
       allow read: if isSignedIn();
 
       // Field operators can submit new cameras only in pending state for themselves.
-      allow create: if isFieldOperator() &&
+      allow create: if isSignedIn() &&
         request.resource.data.addedBy == request.auth.uid &&
+        request.resource.data.fieldOperatorId == request.auth.uid &&
         request.resource.data.status == 'pending' &&
         request.resource.data.approvedBy == null &&
         request.resource.data.createdAt != null;

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { addDoc, collection, doc, getDoc, getDocs, query, serverTimestamp, updateDoc, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
 import dynamic from "next/dynamic";
 import { auth, db } from "@/lib/firebase";
 import { ROLES } from "@/lib/roles";
@@ -192,6 +192,9 @@ export default function FieldOperatorAddCameraPage() {
     setLoading(true);
 
     try {
+      // Refresh claims before Firestore write (role updates can lag on cached tokens).
+      await auth.currentUser.getIdToken(true);
+
       const payload = {
         cameraName: form.cameraName.trim(),
         location: form.location.trim(),
@@ -200,6 +203,7 @@ export default function FieldOperatorAddCameraPage() {
         policeStationId: form.policeStationId,
         policeStationName: selectedStationName,
         description: form.description.trim(),
+        fieldOperatorId: auth.currentUser.uid,
         addedBy: auth.currentUser.uid,
         status: "pending",
         approvedBy: null,
@@ -211,8 +215,11 @@ export default function FieldOperatorAddCameraPage() {
         active: false,
       };
 
-      const docRef = await addDoc(collection(db, "cameras"), payload);
-      await updateDoc(docRef, { cameraId: docRef.id });
+      const cameraRef = doc(collection(db, "cameras"));
+      await setDoc(cameraRef, {
+        ...payload,
+        cameraId: cameraRef.id,
+      });
 
       setMessage("Camera submitted successfully. Waiting for admin approval.");
       setForm({
