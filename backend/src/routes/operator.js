@@ -75,9 +75,38 @@ router.get("/cameras", verifyToken, async (req, res) => {
  * 🏫 Get police stations for authenticated users
  * ======================================================
  */
-router.get("/police-stations", verifyToken, async (_req, res) => {
+router.get("/police-stations", verifyToken, async (req, res) => {
   try {
-    const snap = await admin.firestore().collection("policeStations").get();
+    const role = req.user?.role;
+    const uid = req.user?.uid;
+    let snap;
+
+    if (role === "field_operator") {
+      const fieldOperatorSnap = await admin
+        .firestore()
+        .collection("field_operator")
+        .doc(uid)
+        .get();
+
+      if (!fieldOperatorSnap.exists) {
+        return res.status(200).json([]);
+      }
+
+      const fieldOperator = fieldOperatorSnap.data() || {};
+      const creatorAdminUid = fieldOperator.createdBy;
+
+      if (!creatorAdminUid) {
+        return res.status(200).json([]);
+      }
+
+      snap = await admin
+        .firestore()
+        .collection("policeStations")
+        .where("createdBy", "==", creatorAdminUid)
+        .get();
+    } else {
+      snap = await admin.firestore().collection("policeStations").get();
+    }
 
     const stations = snap.docs.map((doc) => ({
       id: doc.id,
