@@ -11,6 +11,7 @@ import FieldOperatorSidebar from "@/components/FieldOperatorSidebar";
 
 export default function FieldOperatorDashboard() {
   const router = useRouter();
+  const [error, setError] = useState("");
   const [summary, setSummary] = useState({
     total: 0,
     pending: 0,
@@ -31,25 +32,36 @@ export default function FieldOperatorDashboard() {
         return;
       }
 
-      const snap = await getDocs(
-        query(collection(db, "cameras"), where("addedBy", "==", user.uid))
-      );
+      try {
+        const snap = await getDocs(
+          query(collection(db, "cameras"), where("addedBy", "==", user.uid))
+        );
 
-      const counters = {
-        total: snap.size,
-        pending: 0,
-        approved: 0,
-        rejected: 0,
-      };
+        const counters = {
+          total: snap.size,
+          pending: 0,
+          approved: 0,
+          rejected: 0,
+        };
 
-      snap.docs.forEach((docSnap) => {
-        const status = docSnap.data().status || "pending";
-        if (status === "approved") counters.approved += 1;
-        else if (status === "rejected") counters.rejected += 1;
-        else counters.pending += 1;
-      });
+        snap.docs.forEach((docSnap) => {
+          const status = docSnap.data().status || "pending";
+          if (status === "approved") counters.approved += 1;
+          else if (status === "rejected") counters.rejected += 1;
+          else counters.pending += 1;
+        });
 
-      setSummary(counters);
+        setSummary(counters);
+        setError("");
+      } catch (error) {
+        console.error("Failed to load field operator summary:", error);
+        const isPermissionDenied = (error?.code || "").includes("permission-denied");
+        setError(
+          isPermissionDenied
+            ? "Access denied while loading your camera summary. Please re-login or contact admin."
+            : "Unable to load dashboard data right now. Please try again."
+        );
+      }
     });
 
     return () => unsub();
@@ -61,6 +73,12 @@ export default function FieldOperatorDashboard() {
 
       <div className="flex-1">
         <Navbar title="Field Operator Dashboard" />
+
+        {error && (
+          <div className="px-6 pt-6">
+            <div className="app-card p-4 text-rose-700">{error}</div>
+          </div>
+        )}
 
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
           <div className="app-card p-5">

@@ -162,12 +162,18 @@ export default function ImageDetectionPage() {
       return;
     }
 
+    if (!auth.currentUser) {
+      router.replace("/login");
+      return;
+    }
+
     setLoading(true);
     setError("");
     setResult(null);
 
     const formData = new FormData();
     formData.append("image", image);
+    formData.append("cameraId", selectedCamera.cameraId);
     formData.append(
       "location",
       JSON.stringify({
@@ -179,10 +185,15 @@ export default function ImageDetectionPage() {
     );
 
     try {
+      const token = await auth.currentUser.getIdToken();
+
       const res = await fetch(
         "http://localhost:5000/api/detect/image",
         {
           method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
           body: formData,
         }
       );

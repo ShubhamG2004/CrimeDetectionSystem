@@ -5,6 +5,7 @@ const FormData = require("form-data");
 const cloudinary = require("../config/cloudinary");
 const { admin, db } = require("../config/firebase");
 const { findNearestStation } = require("../controllers/policeStation.controller");
+const { verifyToken } = require("../middleware/auth");
 
 const router = express.Router();
 const upload = multer({ storage: multer.memoryStorage() });
@@ -46,7 +47,7 @@ const calculateThreatScore = ({ confidence = 0, threat_level = "LOW" }) => {
 /* --------------------------------------------------
    📥 IMAGE DETECTION ROUTE
 -------------------------------------------------- */
-router.post("/image", upload.single("image"), async (req, res) => {
+router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
   console.log("\n📥 IMAGE DETECTION REQUEST RECEIVED");
 
   try {
@@ -60,16 +61,67 @@ router.post("/image", upload.single("image"), async (req, res) => {
 
     /* ---------- LOCATION ---------- */
     const rawLocation = parseJSON(req.body.location) || {};
+    const requestedCameraId = req.body.cameraId || rawLocation.cameraId || null;
+
+    if (!requestedCameraId) {
+      return res.status(400).json({
+        success: false,
+        message: "cameraId is required",
+      });
+    }
+
+    const cameraSnap = await db.collection("cameras").doc(requestedCameraId).get();
+    if (!cameraSnap.exists) {
+      return res.status(404).json({
+        success: false,
+        message: "Camera not found",
+      });
+    }
+
+    const cameraData = cameraSnap.data() || {};
+
+    if (cameraData.status === "pending" || cameraData.active === false) {
+      return res.status(403).json({
+        success: false,
+        message: "Camera is not approved/active for detection",
+      });
+    }
+
+    if (req.user?.role === "operator") {
+      const operatorSnap = await db.collection("operators").doc(req.user.uid).get();
+      const operatorData = operatorSnap.exists ? operatorSnap.data() : null;
+      const assignedCameras = Array.isArray(operatorData?.cameras)
+        ? operatorData.cameras
+        : [];
+
+      if (!assignedCameras.includes(requestedCameraId)) {
+        return res.status(403).json({
+          success: false,
+          message: "You are not assigned to this camera",
+        });
+      }
+    }
+
+    if (req.user?.role === "field_operator" && cameraData.addedBy && cameraData.addedBy !== req.user.uid) {
+      return res.status(403).json({
+        success: false,
+        message: "This camera does not belong to your field operator account",
+      });
+    }
 
     const location = {
-      cameraId: rawLocation.cameraId || null,
-      name: rawLocation.name || "Unknown",
+      cameraId: requestedCameraId,
+      name: cameraData.area || cameraData.location || cameraData.name || "Unknown",
       lat:
-        rawLocation.lat !== undefined
+        cameraData.latitude !== undefined
+          ? Number(cameraData.latitude)
+          : rawLocation.lat !== undefined
           ? Number(rawLocation.lat)
           : null,
       lng:
-        rawLocation.lng !== undefined
+        cameraData.longitude !== undefined
+          ? Number(cameraData.longitude)
+          : rawLocation.lng !== undefined
           ? Number(rawLocation.lng)
           : null,
     };

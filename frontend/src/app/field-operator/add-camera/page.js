@@ -15,6 +15,7 @@ export default function FieldOperatorAddCameraPage() {
   const [stations, setStations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [loadError, setLoadError] = useState("");
 
   const [form, setForm] = useState({
     cameraName: "",
@@ -39,12 +40,23 @@ export default function FieldOperatorAddCameraPage() {
         return;
       }
 
-      const stationsSnap = await getDocs(collection(db, "policeStations"));
-      const stationList = stationsSnap.docs.map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      }));
-      setStations(stationList);
+      try {
+        const stationsSnap = await getDocs(collection(db, "policeStations"));
+        const stationList = stationsSnap.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }));
+        setStations(stationList);
+        setLoadError("");
+      } catch (error) {
+        console.error("Failed to load police stations:", error);
+        const isPermissionDenied = (error?.code || "").includes("permission-denied");
+        setLoadError(
+          isPermissionDenied
+            ? "Access denied while loading police stations. Please re-login or contact admin."
+            : "Unable to load police stations right now."
+        );
+      }
     });
 
     return () => unsub();
@@ -130,6 +142,10 @@ export default function FieldOperatorAddCameraPage() {
         <div className="p-6">
           <form onSubmit={handleSubmit} className="app-card p-6 max-w-3xl">
             <h2 className="text-xl font-semibold text-slate-900 mb-5">Camera Details</h2>
+
+            {loadError && (
+              <p className="mb-4 text-sm text-rose-700">{loadError}</p>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <input

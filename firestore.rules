@@ -17,6 +17,23 @@ service cloud.firestore {
       return hasRole('field_operator');
     }
 
+    function isOperator() {
+      return hasRole('operator');
+    }
+
+    function operatorDoc() {
+      return get(/databases/$(database)/documents/operators/$(request.auth.uid));
+    }
+
+    function canReadIncidentForAssignedCamera() {
+      return isOperator() &&
+        operatorDoc().exists() &&
+        operatorDoc().data.cameras != null &&
+        resource.data.location != null &&
+        resource.data.location.cameraId != null &&
+        resource.data.location.cameraId in operatorDoc().data.cameras;
+    }
+
     function isValidCameraStatus(status) {
       return status in ['pending', 'approved', 'rejected'];
     }
@@ -35,6 +52,27 @@ service cloud.firestore {
     match /operators/{operatorId} {
       allow read: if isSignedIn() && (isAdmin() || request.auth.uid == operatorId);
       allow create, update, delete: if isAdmin();
+    }
+
+    match /incidents/{incidentId} {
+      allow read: if isSignedIn() && (isAdmin() || canReadIncidentForAssignedCamera());
+
+      allow create: if isAdmin();
+
+      allow update: if isAdmin() || (
+        canReadIncidentForAssignedCamera() &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'status',
+          'acknowledgedAt',
+          'acknowledgedBy',
+          'resolvedAt',
+          'resolvedBy',
+          'updatedAt'
+        ]) &&
+        request.resource.data.status in ['acknowledged', 'resolved']
+      );
+
+      allow delete: if isAdmin();
     }
 
     match /policeStations/{stationId} {
