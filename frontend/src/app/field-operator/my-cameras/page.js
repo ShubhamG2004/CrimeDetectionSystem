@@ -103,9 +103,9 @@ export default function MyCamerasPage() {
               <thead className="bg-slate-100 text-slate-700 text-sm">
                 <tr>
                   <th className="p-3 text-left">Camera Name</th>
+                  <th className="p-3 text-left">Camera ID</th>
                   <th className="p-3 text-left">Location</th>
                   <th className="p-3 text-left">Police Station</th>
-                  <th className="p-3 text-center">IP Address</th>
                   <th className="p-3 text-center">Status</th>
                 </tr>
               </thead>
@@ -113,9 +113,9 @@ export default function MyCamerasPage() {
                 {!loading && cameras.map((cam) => (
                   <tr key={cam.id} className="border-t border-slate-100 hover:bg-slate-50/70">
                     <td className="p-3 font-medium">{cam.cameraName || cam.name}</td>
+                    <td className="p-3">{cam.cameraIdentifier || cam.cameraComId || "-"}</td>
                     <td className="p-3">{cam.location || cam.area}</td>
                     <td className="p-3">{cam.policeStationName || "-"}</td>
-                    <td className="p-3 text-center">{cam.ipAddress || "-"}</td>
                     <td className="p-3 text-center">
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusClass(cam.status)}`}>
                         {(cam.status || "pending").toUpperCase()}

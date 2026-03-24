@@ -26,7 +26,6 @@ export default function FieldOperatorAddCameraPage() {
 
   const [form, setForm] = useState({
     cameraName: "",
-    ipAddress: "",
     location: "",
     latitude: "",
     longitude: "",
@@ -181,7 +180,6 @@ export default function FieldOperatorAddCameraPage() {
 
     if (
       !form.cameraName ||
-      !form.ipAddress ||
       !form.location ||
       !form.latitude ||
       !form.longitude ||
@@ -196,7 +194,6 @@ export default function FieldOperatorAddCameraPage() {
     try {
       const payload = {
         cameraName: form.cameraName.trim(),
-        ipAddress: form.ipAddress.trim(),
         location: form.location.trim(),
         latitude: Number(form.latitude),
         longitude: Number(form.longitude),
@@ -220,7 +217,6 @@ export default function FieldOperatorAddCameraPage() {
       setMessage("Camera submitted successfully. Waiting for admin approval.");
       setForm({
         cameraName: "",
-        ipAddress: "",
         location: "",
         latitude: "",
         longitude: "",
@@ -256,14 +252,6 @@ export default function FieldOperatorAddCameraPage() {
                 placeholder="Camera Name"
                 value={form.cameraName}
                 onChange={(e) => setForm({ ...form, cameraName: e.target.value })}
-                required
-              />
-
-              <input
-                className="app-input"
-                placeholder="IP Address"
-                value={form.ipAddress}
-                onChange={(e) => setForm({ ...form, ipAddress: e.target.value })}
                 required
               />
 
