@@ -70,5 +70,29 @@ router.get("/cameras", verifyToken, async (req, res) => {
   }
 });
 
+/**
+ * ======================================================
+ * 🏫 Get police stations for authenticated users
+ * ======================================================
+ */
+router.get("/police-stations", verifyToken, async (_req, res) => {
+  try {
+    const snap = await admin.firestore().collection("policeStations").get();
+
+    const stations = snap.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    return res.status(200).json(stations);
+  } catch (err) {
+    console.error("❌ POLICE STATIONS ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch police stations",
+    });
+  }
+});
+
 
 module.exports = router;

@@ -32,35 +32,67 @@ export default function FieldOperatorDashboard() {
         return;
       }
 
-      try {
-        const snap = await getDocs(
-          query(collection(db, "cameras"), where("addedBy", "==", user.uid))
-        );
-
+      const buildCounters = (items) => {
         const counters = {
-          total: snap.size,
+          total: items.length,
           pending: 0,
           approved: 0,
           rejected: 0,
         };
 
-        snap.docs.forEach((docSnap) => {
-          const status = docSnap.data().status || "pending";
+        items.forEach((item) => {
+          const status = item?.status || "pending";
           if (status === "approved") counters.approved += 1;
           else if (status === "rejected") counters.rejected += 1;
           else counters.pending += 1;
         });
 
-        setSummary(counters);
+        return counters;
+      };
+
+      try {
+        // Refresh token before Firestore calls, especially after role changes.
+        await user.getIdToken(true);
+
+        const snap = await getDocs(
+          query(collection(db, "cameras"), where("addedBy", "==", user.uid))
+        );
+
+        const cameras = snap.docs.map((docSnap) => docSnap.data());
+        setSummary(buildCounters(cameras));
         setError("");
       } catch (error) {
         console.error("Failed to load field operator summary:", error);
         const isPermissionDenied = (error?.code || "").includes("permission-denied");
-        setError(
-          isPermissionDenied
-            ? "Access denied while loading your camera summary. Please re-login or contact admin."
-            : "Unable to load dashboard data right now. Please try again."
-        );
+
+        if (isPermissionDenied) {
+          try {
+            // Fallback via backend Admin SDK path when client Firestore rules deny reads.
+            const token = await user.getIdToken();
+            const res = await fetch("http://localhost:5000/api/cameras", {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+
+            if (!res.ok) {
+              throw new Error(`HTTP_${res.status}`);
+            }
+
+            const allCameras = await res.json();
+            const myCameras = Array.isArray(allCameras)
+              ? allCameras.filter((camera) => camera?.addedBy === user.uid)
+              : [];
+
+            setSummary(buildCounters(myCameras));
+            setError("");
+            return;
+          } catch (fallbackError) {
+            console.error("Fallback summary load failed:", fallbackError);
+          }
+        }
+
+        setError("Unable to load dashboard data right now. Please try again.");
       }
     });
 

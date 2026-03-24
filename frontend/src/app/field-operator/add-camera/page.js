@@ -51,6 +51,29 @@ export default function FieldOperatorAddCameraPage() {
       } catch (error) {
         console.error("Failed to load police stations:", error);
         const isPermissionDenied = (error?.code || "").includes("permission-denied");
+
+        if (isPermissionDenied) {
+          try {
+            const token = await user.getIdToken();
+            const response = await fetch("http://localhost:5000/api/operator/police-stations", {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+
+            if (!response.ok) {
+              throw new Error(`HTTP_${response.status}`);
+            }
+
+            const data = await response.json();
+            setStations(Array.isArray(data) ? data : []);
+            setLoadError("");
+            return;
+          } catch (fallbackError) {
+            console.error("Fallback police station load failed:", fallbackError);
+          }
+        }
+
         setLoadError(
           isPermissionDenied
             ? "Access denied while loading police stations. Please re-login or contact admin."
