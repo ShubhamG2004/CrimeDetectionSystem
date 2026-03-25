@@ -56,12 +56,12 @@ service cloud.firestore {
     }
 
     match /field_operator/{operatorId} {
-      allow read: if isSignedIn() && (isAdmin() || request.auth.uid == operatorId);
+      allow read: if isSignedIn();
       allow create, update, delete: if isAdmin();
     }
 
     match /operators/{operatorId} {
-      allow read: if isSignedIn() && (isAdmin() || request.auth.uid == operatorId);
+      allow read: if isSignedIn();
       allow create, update, delete: if isAdmin();
     }
 
