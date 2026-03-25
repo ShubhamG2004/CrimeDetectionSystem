@@ -23,25 +23,25 @@ const kpiCards = [
     title: "System Status",
     value: "Operational",
     note: "All core services healthy",
-    accent: "from-emerald-500/15 to-emerald-200/20",
+    accent: "from-white via-zinc-50 to-neutral-100 border border-black/5",
   },
   {
     title: "Monitoring Coverage",
     value: "Citywide",
     note: "Live watch across camera zones",
-    accent: "from-sky-500/15 to-sky-200/20",
+    accent: "from-white via-zinc-100 to-neutral-50 border border-black/5",
   },
   {
     title: "Response Readiness",
     value: "High",
     note: "Rapid dispatch pipeline active",
-    accent: "from-amber-500/15 to-amber-200/20",
+    accent: "from-white via-zinc-50 to-neutral-200 border border-black/5",
   },
   {
     title: "Audit Logging",
     value: "Enabled",
     note: "Operator actions are tracked",
-    accent: "from-violet-500/15 to-fuchsia-200/20",
+    accent: "from-white via-zinc-50 to-neutral-200 border border-black/5",
   },
 ];
 
@@ -52,7 +52,7 @@ const quickActions = [
     href: "/dashboard/admin/live-monitoring",
     icon: Radio,
     badge: "Priority",
-    tone: "from-rose-500 to-orange-500",
+    tone: "from-black to-neutral-900",
   },
   {
     title: "Analytics",
@@ -60,7 +60,7 @@ const quickActions = [
     href: "/analytics",
     icon: BarChart3,
     badge: "Insights",
-    tone: "from-cyan-500 to-blue-600",
+    tone: "from-neutral-900 to-neutral-800",
   },
   {
     title: "Camera Management",
@@ -68,7 +68,7 @@ const quickActions = [
     href: "/dashboard/admin/cameras",
     icon: Camera,
     badge: "Governance",
-    tone: "from-indigo-500 to-slate-700",
+    tone: "from-neutral-900 to-neutral-700",
   },
   {
     title: "Field Operators",
@@ -76,7 +76,7 @@ const quickActions = [
     href: "/dashboard/admin/field-operators",
     icon: UserCog,
     badge: "Workforce",
-    tone: "from-emerald-500 to-teal-700",
+    tone: "from-neutral-900 to-stone-700",
   },
   {
     title: "Operator Logs",
@@ -84,7 +84,7 @@ const quickActions = [
     href: "/dashboard/admin/operator-logs",
     icon: ClipboardList,
     badge: "Audit",
-    tone: "from-amber-500 to-orange-700",
+    tone: "from-neutral-800 to-stone-600",
   },
 ];
 
@@ -114,44 +114,14 @@ export default function AdminDashboard() {
   }, [router]); // ✅ dependency array NEVER changes
 
   return (
-    <div className="app-shell flex bg-[radial-gradient(circle_at_top_left,_#ecfeff,_#f8fafc_42%,_#f1f5f9_100%)]">
+    <div className="app-shell flex min-h-screen bg-gradient-to-br from-white via-zinc-50 to-white text-slate-900">
       <AdminSidebar />
 
       <div className="flex-1 min-w-0">
         <Navbar title="Admin Control Dashboard" />
 
         <main className="relative p-4 sm:p-6 lg:p-8 space-y-6">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-r from-cyan-300/20 via-sky-300/10 to-transparent blur-3xl" />
-
-          <section className="relative app-card overflow-hidden border-slate-900/20 bg-gradient-to-br from-slate-950 via-slate-900 to-cyan-950 text-white p-6 sm:p-8">
-            <div className="absolute -right-16 -top-16 h-48 w-48 rounded-full bg-cyan-400/20 blur-2xl" />
-            <div className="absolute -left-16 -bottom-16 h-44 w-44 rounded-full bg-sky-300/15 blur-2xl" />
-
-            <div className="relative flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-2xl space-y-3">
-                <p className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.14em] text-cyan-100">
-                  <ShieldAlert className="h-3.5 w-3.5" />
-                  Security Command Center
-                </p>
-                <h2 className="text-2xl sm:text-3xl font-semibold tracking-tight">
-                  Coordinate surveillance, response, and governance from one control plane.
-                </h2>
-                <p className="text-sm sm:text-base text-slate-200/90 leading-relaxed">
-                  Use the quick actions below to prioritize active incidents, validate camera activity, and keep your operator workflow accountable.
-                </p>
-              </div>
-
-              <div className="flex flex-wrap gap-3">
-                <Link href="/dashboard/admin/live-monitoring" className="app-button border border-white/20 bg-white/15 hover:bg-white/20">
-                  Open Live Feed
-                  <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link href="/analytics" className="app-button-secondary border-white/20 bg-white/10 text-white hover:bg-white/15">
-                  Review Analytics
-                </Link>
-              </div>
-            </div>
-          </section>
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-r from-black/5 via-neutral-200/20 to-transparent blur-3xl" />
 
           <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
             {kpiCards.map((card) => (
@@ -173,7 +143,7 @@ export default function AdminDashboard() {
               <h3 className="text-lg sm:text-xl font-semibold text-slate-900">
                 Quick Action Modules
               </h3>
-              <span className="app-badge">Admin Workspace</span>
+              <span className="app-badge bg-black text-white">Admin Workspace</span>
             </div>
 
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -184,11 +154,11 @@ export default function AdminDashboard() {
                   <Link
                     key={action.title}
                     href={action.href}
-                    className="group app-card p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-400/60"
+                    className="group app-card border border-black/5 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="space-y-3">
-                        <span className="app-badge bg-slate-50">{action.badge}</span>
+                        <span className="app-badge bg-black text-white">{action.badge}</span>
                         <h4 className="text-lg font-semibold text-slate-900">{action.title}</h4>
                       </div>
                       <div className={`rounded-xl bg-gradient-to-br ${action.tone} p-2.5 text-white shadow-sm`}>
