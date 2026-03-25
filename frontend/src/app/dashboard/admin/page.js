@@ -10,8 +10,11 @@ import {
   Camera,
   ClipboardList,
   Radio,
-  ShieldAlert,
   UserCog,
+  Activity,
+  Shield,
+  AlertTriangle,
+  CheckCircle2,
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { ROLES } from "@/lib/roles";
@@ -22,25 +25,33 @@ const kpiCards = [
   {
     title: "System Status",
     value: "Operational",
-    note: "All core services healthy",
+    trend: "+99.9% uptime",
+    icon: CheckCircle2,
+    iconColor: "text-emerald-600",
     accent: "from-white via-zinc-50 to-neutral-100 border border-black/5",
   },
   {
     title: "Monitoring Coverage",
     value: "Citywide",
-    note: "Live watch across camera zones",
+    trend: "156 active cameras",
+    icon: Activity,
+    iconColor: "text-blue-600",
     accent: "from-white via-zinc-100 to-neutral-50 border border-black/5",
   },
   {
     title: "Response Readiness",
     value: "High",
-    note: "Rapid dispatch pipeline active",
+    trend: "Avg. 2.4 min response",
+    icon: Shield,
+    iconColor: "text-purple-600",
     accent: "from-white via-zinc-50 to-neutral-200 border border-black/5",
   },
   {
-    title: "Audit Logging",
-    value: "Enabled",
-    note: "Operator actions are tracked",
+    title: "Active Alerts",
+    value: "3",
+    trend: "2 critical · 1 warning",
+    icon: AlertTriangle,
+    iconColor: "text-amber-600",
     accent: "from-white via-zinc-50 to-neutral-200 border border-black/5",
   },
 ];
@@ -88,13 +99,11 @@ const quickActions = [
   },
 ];
 
-
 export default function AdminDashboard() {
   const router = useRouter();
   const checkedRef = useRef(false);
 
   useEffect(() => {
-    // ✅ ensure this effect runs only once
     if (checkedRef.current) return;
     checkedRef.current = true;
 
@@ -111,74 +120,131 @@ export default function AdminDashboard() {
     });
 
     return () => unsub();
-  }, [router]); // ✅ dependency array NEVER changes
+  }, [router]);
 
   return (
-    <div className="app-shell flex min-h-screen bg-gradient-to-br from-white via-zinc-50 to-white text-slate-900">
+    <div className="flex min-h-screen bg-gradient-to-br from-white via-zinc-50 to-white text-slate-900">
       <AdminSidebar />
 
       <div className="flex-1 min-w-0">
         <Navbar title="Admin Control Dashboard" />
 
-        <main className="relative p-4 sm:p-6 lg:p-8 space-y-6">
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-36 bg-gradient-to-r from-black/5 via-neutral-200/20 to-transparent blur-3xl" />
+        <main className="relative p-4 sm:p-6 lg:p-8">
+          {/* Welcome Section */}
+          <div className="mb-8">
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900">
+              Welcome back
+            </h1>
+            <p className="mt-1 text-slate-600">
+              Monitor system health and manage operations from your command center.
+            </p>
+          </div>
 
-          <section className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            {kpiCards.map((card) => (
-              <article
-                key={card.title}
-                className={`app-card p-5 bg-gradient-to-br ${card.accent} transition-transform duration-200 hover:-translate-y-1`}
-              >
-                <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
-                  {card.title}
+          {/* KPI Cards Grid */}
+          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4 mb-10">
+            {kpiCards.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div
+                  key={card.title}
+                  className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${card.accent} p-5 transition-all duration-200 hover:shadow-md`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                        {card.title}
+                      </p>
+                      <p className="mt-2 text-3xl font-bold text-slate-900">
+                        {card.value}
+                      </p>
+                      <p className="mt-2 text-xs text-slate-500">{card.trend}</p>
+                    </div>
+                    <div className={`rounded-xl bg-white/50 p-2.5 shadow-sm ${card.iconColor}`}>
+                      <Icon className="h-5 w-5" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Quick Actions Section */}
+          <div>
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-900">
+                  Quick Actions
+                </h2>
+                <p className="text-sm text-slate-500 mt-0.5">
+                  Frequently used administrative tools
                 </p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">{card.value}</p>
-                <p className="mt-2 text-sm text-slate-600">{card.note}</p>
-              </article>
-            ))}
-          </section>
-
-          <section className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <h3 className="text-lg sm:text-xl font-semibold text-slate-900">
-                Quick Action Modules
-              </h3>
-              <span className="app-badge bg-black text-white">Admin Workspace</span>
+              </div>
+              <div className="px-3 py-1.5 rounded-full bg-black/5 text-xs font-medium text-slate-700">
+                Admin Access
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
               {quickActions.map((action) => {
                 const Icon = action.icon;
-
                 return (
                   <Link
                     key={action.title}
                     href={action.href}
-                    className="group app-card border border-black/5 bg-white p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/40"
+                    className="group relative overflow-hidden rounded-2xl border border-black/5 bg-white p-5 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-black/20"
                   >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="space-y-3">
-                        <span className="app-badge bg-black text-white">{action.badge}</span>
-                        <h4 className="text-lg font-semibold text-slate-900">{action.title}</h4>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-3">
+                          <span className="inline-flex rounded-full bg-black/5 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                            {action.badge}
+                          </span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-slate-900 group-hover:text-slate-800 transition-colors">
+                          {action.title}
+                        </h3>
+                        <p className="mt-2 text-sm leading-relaxed text-slate-500">
+                          {action.description}
+                        </p>
+                        <div className="mt-4 inline-flex items-center gap-1.5 text-sm font-medium text-slate-700 group-hover:text-slate-900 transition-colors">
+                          Access
+                          <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                        </div>
                       </div>
-                      <div className={`rounded-xl bg-gradient-to-br ${action.tone} p-2.5 text-white shadow-sm`}>
+                      <div className={`ml-4 rounded-xl bg-gradient-to-br ${action.tone} p-2.5 text-white shadow-sm shrink-0`}>
                         <Icon className="h-5 w-5" />
                       </div>
-                    </div>
-
-                    <p className="mt-3 text-sm leading-relaxed text-slate-600">
-                      {action.description}
-                    </p>
-
-                    <div className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-slate-800">
-                      Open module
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                     </div>
                   </Link>
                 );
               })}
             </div>
-          </section>
+          </div>
+
+          {/* Recent Activity Placeholder - Optional */}
+          <div className="mt-10 pt-6 border-t border-black/5">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-500">
+                Recent System Events
+              </h3>
+              <button className="text-xs text-slate-500 hover:text-slate-700 transition-colors">
+                View all
+              </button>
+            </div>
+            <div className="space-y-2">
+              {[
+                { time: "2 min ago", event: "Camera feed restored - Zone A-12", type: "success" },
+                { time: "15 min ago", event: "Alert triaged by operator #3421", type: "info" },
+                { time: "1 hour ago", event: "System health check completed", type: "info" },
+              ].map((activity, idx) => (
+                <div key={idx} className="flex items-center gap-3 py-2">
+                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <p className="text-sm text-slate-600 flex-1">{activity.event}</p>
+                  <span className="text-xs text-slate-400">{activity.time}</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </main>
       </div>
     </div>
