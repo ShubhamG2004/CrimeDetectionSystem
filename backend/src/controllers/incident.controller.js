@@ -1,5 +1,9 @@
 const cloudinary = require("../config/cloudinary");
 const { admin, db } = require("../config/firebase");
+const {
+  triggerStationAlert,
+  shouldTriggerAlert,
+} = require("../services/alert.service");
 
 /**
  * Create & save crime incident
@@ -50,24 +54,26 @@ exports.createIncident = async (req, res) => {
       lng: null,
     };
 
+    let cameraData = null;
+
     const cameraDoc = await db
       .collection("cameras")
       .doc(cameraId)
       .get();
 
     if (cameraDoc.exists) {
-      const cam = cameraDoc.data();
+      cameraData = cameraDoc.data();
 
       location = {
-        name: cam.name || "Camera",
-        area: cam.area || "Unknown Area",
+        name: cameraData.name || "Camera",
+        area: cameraData.area || "Unknown Area",
         lat:
-          typeof cam.latitude === "number"
-            ? cam.latitude
+          typeof cameraData.latitude === "number"
+            ? cameraData.latitude
             : null,
         lng:
-          typeof cam.longitude === "number"
-            ? cam.longitude
+          typeof cameraData.longitude === "number"
+            ? cameraData.longitude
             : null,
       };
     }
@@ -113,6 +119,24 @@ exports.createIncident = async (req, res) => {
         id: docRef.id,
         ...incidentData,
       });
+    }
+
+    if (shouldTriggerAlert({
+      threat_level: incidentData.threat_level,
+      threat_score: incidentData.threat_score,
+    })) {
+      try {
+        await triggerStationAlert({
+          incidentId: docRef.id,
+          incidentData,
+          cameraData: cameraData || {},
+          cameraId,
+          location,
+          io,
+        });
+      } catch (alertErr) {
+        console.error("Alert dispatch error:", alertErr.message);
+      }
     }
 
     // ---------------- RESPONSE ----------------

@@ -51,6 +51,48 @@ curl -X POST http://localhost:5000/api/detect/image \
 
 ---
 
+## 🚨 Automated Station Alerts (NEW)
+
+1. **Camera → Station Mapping**
+  - `POST /api/cameras` and `PUT /api/cameras/:cameraId` now accept `assignedStationId`.
+  - When present, the camera keeps a snapshot of the police station (`assignedStation`).
+  - If no station is assigned, the backend falls back to the nearest station by latitude/longitude.
+
+2. **Automatic Trigger Conditions**
+  - Alerts fire when `threat_level` is `HIGH` or `CRITICAL`, or when the computed `threat_score` ≥ `ALERT_SCORE_THRESHOLD` (default **70**).
+  - The AI detection route (`/api/detect/image`) and the generic incident creator both invoke the alert service.
+
+3. **Notification Channels**
+  - **SMS** via Twilio (set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`).
+  - **Email** via SMTP (set `ALERT_SMTP_HOST`, `ALERT_SMTP_PORT`, `ALERT_SMTP_USER`, `ALERT_SMTP_PASS`, optional `ALERT_EMAIL_FROM`).
+  - **Dashboard** via Socket.IO event `alert:created` (consumed by police dashboard clients).
+
+4. **Alert Persistence**
+  - Every alert is stored in a new `alerts` collection with metadata (`camera`, `station`, `status`, `deliveryLog`).
+  - Default status workflow: `pending → acknowledged → resolved` (see `ALERT_STATUS`).
+  - The associated incident still contains `nearestStation` for UI context.
+
+5. **Alert Management API**
+  ```http
+  GET    /api/alerts?status=pending&stationId=ST_001   # List alerts
+  GET    /api/alerts/{alertId}                         # View details
+  PATCH  /api/alerts/{alertId}/status                  # Update status
+  ```
+  ```bash
+  curl -X PATCH "http://localhost:5000/api/alerts/ALERT123/status" \
+    -H "Authorization: Bearer <token>" \
+    -H "Content-Type: application/json" \
+    -d '{"status":"acknowledged","notes":"Dispatch notified"}'
+  ```
+
+6. **Realtime Dashboard Hooks**
+  - Listen for `alert:created` to show new station alerts instantly.
+  - Existing `new-incident` event is still emitted for global monitoring.
+
+> **Tip:** set `POLICE_DASHBOARD_URL` so email templates link to the correct dashboard.
+
+---
+
 ## 📖 What's New (TL;DR)
 
 ### New Weapon Signals

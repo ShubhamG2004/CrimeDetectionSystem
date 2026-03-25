@@ -1,7 +1,32 @@
 const express = require("express");
 const router = express.Router();
-const { db } = require("../config/firebase");
+const { db, admin } = require("../config/firebase");
 const { verifyToken, requireAdmin } = require("../middleware/auth");
+
+const fetchAssignedStation = async (stationId) => {
+  if (!stationId) {
+    return null;
+  }
+
+  const doc = await db.collection("policeStations").doc(String(stationId)).get();
+  if (!doc.exists) {
+    const err = new Error("Station not found");
+    err.code = "station/not-found";
+    throw err;
+  }
+
+  const data = doc.data();
+  return {
+    id: doc.id,
+    stationName: data.stationName || "Unknown Station",
+    contactNumber: data.contactNumber || null,
+    alertEmail: data.alertEmail || null,
+    emergencyNumber: data.emergencyNumber || null,
+    officerInCharge: data.officerInCharge || null,
+    jurisdictionRadius: data.jurisdictionRadius || null,
+    location: data.location || null,
+  };
+};
 
 /* ================================
    📋 Get all cameras
@@ -40,7 +65,7 @@ router.post("/", verifyToken, requireAdmin, async (req, res) => {
     console.log("ADD CAMERA BODY:", req.body);
     console.log("USER ROLE:", req.user?.role);
 
-    const { name, area, latitude, longitude, active } = req.body;
+    const { name, area, latitude, longitude, active, assignedStationId } = req.body;
 
     if (
       !name ||
@@ -61,6 +86,21 @@ router.post("/", verifyToken, requireAdmin, async (req, res) => {
       });
     }
 
+    let assignedStation = null;
+    if (assignedStationId) {
+      try {
+        assignedStation = await fetchAssignedStation(assignedStationId);
+      } catch (stationErr) {
+        if (stationErr.code === "station/not-found") {
+          return res.status(400).json({
+            success: false,
+            message: "Assigned police station not found",
+          });
+        }
+        throw stationErr;
+      }
+    }
+
     const cameraRef = db.collection("cameras").doc();
 
     await cameraRef.set({
@@ -69,13 +109,20 @@ router.post("/", verifyToken, requireAdmin, async (req, res) => {
       latitude: Number(latitude),
       longitude: Number(longitude),
       active: active ?? true,
-      createdAt: new Date(),
+      assignedStation,
+      assignedStationId: assignedStation?.id || null,
+      assignedStationUpdatedAt: assignedStation
+        ? admin.firestore.FieldValue.serverTimestamp()
+        : null,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
     res.status(201).json({
       success: true,
       message: "Camera added successfully",
       cameraId: cameraRef.id,
+      assignedStation,
     });
   } catch (err) {
     console.error("ADD CAMERA ERROR:", err);
@@ -92,20 +139,73 @@ router.post("/", verifyToken, requireAdmin, async (req, res) => {
 router.put("/:cameraId", verifyToken, requireAdmin, async (req, res) => {
   try {
     const { cameraId } = req.params;
-    const { name, area, latitude, longitude, active } = req.body;
-
-    await db.collection("cameras").doc(cameraId).update({
+    const {
       name,
       area,
-      latitude: Number(latitude),
-      longitude: Number(longitude),
-      active: Boolean(active),
-      updatedAt: new Date(),
-    });
+      latitude,
+      longitude,
+      active,
+      assignedStationId,
+    } = req.body;
 
-    res.json({ message: "Camera updated successfully" });
+    const updates = {
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (name !== undefined) updates.name = name;
+    if (area !== undefined) updates.area = area;
+
+    if (latitude !== undefined) {
+      if (isNaN(latitude)) {
+        return res.status(400).json({
+          success: false,
+          message: "Latitude must be a valid number",
+        });
+      }
+      updates.latitude = Number(latitude);
+    }
+
+    if (longitude !== undefined) {
+      if (isNaN(longitude)) {
+        return res.status(400).json({
+          success: false,
+          message: "Longitude must be a valid number",
+        });
+      }
+      updates.longitude = Number(longitude);
+    }
+
+    if (active !== undefined) updates.active = Boolean(active);
+
+    if (assignedStationId !== undefined) {
+      if (assignedStationId) {
+        try {
+          const assignedStation = await fetchAssignedStation(assignedStationId);
+          updates.assignedStation = assignedStation;
+          updates.assignedStationId = assignedStation.id;
+          updates.assignedStationUpdatedAt = admin.firestore.FieldValue.serverTimestamp();
+        } catch (stationErr) {
+          if (stationErr.code === "station/not-found") {
+            return res.status(400).json({
+              success: false,
+              message: "Assigned police station not found",
+            });
+          }
+          throw stationErr;
+        }
+      } else {
+        updates.assignedStation = null;
+        updates.assignedStationId = null;
+        updates.assignedStationUpdatedAt = admin.firestore.FieldValue.serverTimestamp();
+      }
+    }
+
+    await db.collection("cameras").doc(cameraId).update(updates);
+
+    res.json({ success: true, message: "Camera updated successfully" });
   } catch (err) {
-    res.status(500).json({ message: "Failed to update camera" });
+    console.error("Failed to update camera:", err.message);
+    res.status(500).json({ success: false, message: "Failed to update camera" });
   }
 });
 

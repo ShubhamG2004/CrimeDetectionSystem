@@ -5,6 +5,10 @@ const FormData = require("form-data");
 const cloudinary = require("../config/cloudinary");
 const { admin, db } = require("../config/firebase");
 const { findNearestStation } = require("../controllers/policeStation.controller");
+const {
+  triggerStationAlert,
+  shouldTriggerAlert,
+} = require("../services/alert.service");
 const { verifyToken } = require("../middleware/auth");
 
 const router = express.Router();
@@ -185,6 +189,8 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
       threat_level,
       threat_score,
 
+      cameraId: requestedCameraId,
+
       persons_detected: Number(persons_detected) || 0,
       activities,
       signals,
@@ -231,6 +237,27 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
         ...incidentData,
         nearestStation,
       });
+    }
+
+    if (
+      shouldTriggerAlert({
+        threat_level,
+        threat_score,
+      })
+    ) {
+      try {
+        await triggerStationAlert({
+          incidentId: docRef.id,
+          incidentData,
+          cameraData,
+          cameraId: requestedCameraId,
+          location,
+          nearestStation,
+          io,
+        });
+      } catch (alertErr) {
+        console.error("Alert dispatch error:", alertErr.message);
+      }
     }
 
     return res.status(201).json({

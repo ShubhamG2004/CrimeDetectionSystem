@@ -7,6 +7,7 @@ const incidentRoutes = require("./routes/incident.routes");
 const cameraRoutes = require("./routes/camera.routes");
 const adminRoutes = require("./routes/admin.routes");
 const detectRoutes = require("./routes/detect.routes");
+const alertRoutes = require("./routes/alert.routes");
 const { db } = require("./config/firebase");
 
 const app = express();
@@ -43,6 +44,8 @@ app.use("/api/cameras", cameraRoutes);
 app.use("/api/admin", adminRoutes);
 
 app.use("/api/detect", detectRoutes);
+
+app.use("/api/alerts", alertRoutes);
 
 app.use("/api/incidents", require("./routes/incident.routes"));
 
