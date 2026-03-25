@@ -34,24 +34,25 @@ export default function MyCamerasPage() {
       }
 
       try {
-        const snap = await getDocs(
-          query(collection(db, "cameras"), where("addedBy", "==", user.uid))
+        const token = await user.getIdToken();
+        const response = await fetch(
+          "http://localhost:5000/api/operator/my-cameras",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
         );
 
-        const data = snap.docs
-          .map((docSnap) => ({
-            id: docSnap.id,
-            ...docSnap.data(),
-          }))
-          .sort((a, b) => {
-            const aMs = a.createdAt?.toMillis?.() || 0;
-            const bMs = b.createdAt?.toMillis?.() || 0;
-            return bMs - aMs;
-          });
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: Failed to fetch cameras`);
+        }
 
-        setCameras(data);
+        const data = await response.json();
+        setCameras(data.cameras || []);
       } catch (error) {
         console.error("Failed to fetch cameras:", error);
+        setCameras([]);
       } finally {
         setLoading(false);
       }

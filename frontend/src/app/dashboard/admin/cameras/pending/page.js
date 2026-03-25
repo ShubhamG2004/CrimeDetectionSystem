@@ -11,6 +11,7 @@ import {
   updateDoc,
   doc,
   serverTimestamp,
+  getDoc,
 } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { ROLES } from "@/lib/roles";
@@ -24,24 +25,44 @@ export default function PendingCamerasPage() {
   const [cameras, setCameras] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState("");
+  const [operatorNamesMap, setOperatorNamesMap] = useState({});
 
   const fetchPendingCameras = async () => {
     const snap = await getDocs(
       query(collection(db, "cameras"), where("status", "==", "pending"))
     );
+    const camerasData = snap.docs
+      .map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+      }))
+      .sort((a, b) => {
+        const aMs = a.createdAt?.toMillis?.() || 0;
+        const bMs = b.createdAt?.toMillis?.() || 0;
+        return bMs - aMs;
+      });
 
-    setCameras(
-      snap.docs
-        .map((docSnap) => ({
-          id: docSnap.id,
-          ...docSnap.data(),
-        }))
-        .sort((a, b) => {
-          const aMs = a.createdAt?.toMillis?.() || 0;
-          const bMs = b.createdAt?.toMillis?.() || 0;
-          return bMs - aMs;
-        })
-    );
+    setCameras(camerasData);
+
+    // Fetch operator names for all unique addedBy UIDs
+    const operatorIds = [...new Set(camerasData.map((cam) => cam.addedBy).filter(Boolean))];
+    const namesMap = {};
+
+    for (const uid of operatorIds) {
+      try {
+        const userDoc = await getDoc(doc(db, "users", uid));
+        if (userDoc.exists()) {
+          namesMap[uid] = userDoc.data().name || userDoc.data().displayName || "Unknown";
+        } else {
+          namesMap[uid] = "Unknown";
+        }
+      } catch (error) {
+        console.error(`Failed to fetch operator name for ${uid}:`, error);
+        namesMap[uid] = "Unknown";
+      }
+    }
+
+    setOperatorNamesMap(namesMap);
   };
 
   useEffect(() => {
@@ -110,7 +131,6 @@ export default function PendingCamerasPage() {
                 <tr>
                   <th className="p-3 text-left">Camera Name</th>
                   <th className="p-3 text-left">Location</th>
-                  <th className="p-3 text-center">IP Address</th>
                   <th className="p-3 text-center">Field Operator</th>
                   <th className="p-3 text-center">Action</th>
                 </tr>
@@ -121,8 +141,7 @@ export default function PendingCamerasPage() {
                   <tr key={cam.id} className="border-t border-slate-100 hover:bg-slate-50/70">
                     <td className="p-3 font-medium">{cam.cameraName || cam.name}</td>
                     <td className="p-3">{cam.location || cam.area || "-"}</td>
-                    <td className="p-3 text-center">{cam.ipAddress || "-"}</td>
-                    <td className="p-3 text-center">{cam.addedBy || "-"}</td>
+                    <td className="p-3 text-center">{operatorNamesMap[cam.addedBy] || "-"}</td>
                     <td className="p-3 text-center space-x-2">
                       <button
                         onClick={() => updateCameraStatus(cam.id, "approved")}
