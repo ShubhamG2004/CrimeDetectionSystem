@@ -1,17 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
 import { auth, db } from "@/lib/firebase";
 import { ROLES } from "@/lib/roles";
 import {
   Activity,
+  CalendarDays,
   Clock3,
+  Edit3,
+  ImagePlus,
   KeyRound,
+  LockKeyhole,
   Mail,
   MapPin,
   Phone,
@@ -67,11 +71,64 @@ const asDate = (value, fallback = null) => {
 const withFallbackArray = (value, fallback) =>
   Array.isArray(value) && value.length > 0 ? value : fallback;
 
+const parseListField = (value = "") =>
+  value
+    .split("\n")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+
+const formatDateOnly = (value) => {
+  const parsed = asDate(value);
+  if (!parsed) return "-";
+
+  return parsed.toLocaleDateString([], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+};
+
+const formatInputDate = (value) => {
+  const parsed = asDate(value);
+  return parsed ? parsed.toISOString().slice(0, 10) : "";
+};
+
+const readFileAsDataUrl = (file) =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result?.toString() || "");
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+
+const getInitials = (value = "") => {
+  const chunks = value.trim().split(/\s+/).filter(Boolean);
+  if (!chunks.length) return "AD";
+  return chunks
+    .slice(0, 2)
+    .map((word) => word[0]?.toUpperCase() || "")
+    .join("");
+};
+
 export default function AdminProfilePage() {
   const router = useRouter();
+  const photoInputRef = useRef(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [editMode, setEditMode] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const [form, setForm] = useState({
+    name: "",
+    phone: "",
+    birthDate: "",
+    responsibilities: "",
+    permissions: "",
+  });
+  const [photoPreview, setPhotoPreview] = useState("");
+  const [photoData, setPhotoData] = useState("");
+  const [photoCleared, setPhotoCleared] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -99,6 +156,8 @@ export default function AdminProfilePage() {
         role: ROLES.ADMIN,
         status: "active",
         phone: user.phoneNumber || null,
+        photoURL: user.photoURL || null,
+        birthDate: null,
         location: null,
         organization: "City Command Center",
         createdAt: user.metadata?.creationTime
@@ -142,6 +201,10 @@ export default function AdminProfilePage() {
               data.department ||
               fallbackProfile.organization,
             createdAt: asDate(data.createdAt, fallbackProfile.createdAt),
+            birthDate: asDate(
+              data.birthDate || data.birthdate,
+              fallbackProfile.birthDate
+            ),
             createdBy:
               data.createdByName ||
               data.createdBy ||
@@ -155,6 +218,11 @@ export default function AdminProfilePage() {
               data.permissions,
               fallbackProfile.permissions
             ),
+            photoURL:
+              data.photoURL ||
+              data.photo ||
+              data.avatar ||
+              fallbackProfile.photoURL,
           });
         } else {
           setProfile(fallbackProfile);
@@ -195,6 +263,131 @@ export default function AdminProfilePage() {
       unsub();
     };
   }, [router]);
+
+  useEffect(() => {
+    if (!profile) return;
+
+    setForm({
+      name: profile.name || "",
+      phone: profile.phone || "",
+      birthDate: formatInputDate(profile.birthDate),
+      responsibilities: profile.responsibilities?.join("\n") || "",
+      permissions: profile.permissions?.join("\n") || "",
+    });
+
+    setPhotoPreview(profile.photoURL || "");
+    setPhotoData("");
+    setPhotoCleared(false);
+    setFeedback(null);
+  }, [profile]);
+
+  const handleInputChange = (event) => {
+    const { name, value } = event.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handlePhotoPick = async (event) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const maxBytes = 2 * 1024 * 1024;
+    if (file.size > maxBytes) {
+      setFeedback({ type: "error", message: "Photo must be smaller than 2 MB." });
+      return;
+    }
+
+    try {
+      const dataUrl = await readFileAsDataUrl(file);
+      setPhotoPreview(dataUrl);
+      setPhotoData(dataUrl);
+      setPhotoCleared(false);
+      setFeedback(null);
+    } catch (err) {
+      console.error("Failed to load photo", err);
+      setFeedback({ type: "error", message: "Could not read that file. Try another image." });
+    }
+  };
+
+  const handlePhotoClear = () => {
+    setPhotoPreview("");
+    setPhotoData("");
+    setPhotoCleared(true);
+  };
+
+  const handleCancelEdit = () => {
+    setEditMode(false);
+    setFeedback(null);
+
+    if (!profile) return;
+
+    setForm({
+      name: profile.name || "",
+      phone: profile.phone || "",
+      birthDate: formatInputDate(profile.birthDate),
+      responsibilities: profile.responsibilities?.join("\n") || "",
+      permissions: profile.permissions?.join("\n") || "",
+    });
+
+    setPhotoPreview(profile.photoURL || "");
+    setPhotoData("");
+    setPhotoCleared(false);
+  };
+
+  const handleSave = async (event) => {
+    event.preventDefault();
+    if (!profile) return;
+
+    setSaving(true);
+    setFeedback(null);
+
+    try {
+      const trimmedName = form.name.trim() || profile.name || "Administrator";
+      const trimmedPhone = form.phone.trim();
+      const birthDateIso = form.birthDate ? new Date(form.birthDate).toISOString() : null;
+      const responsibilitiesList = parseListField(form.responsibilities);
+      const permissionsList = parseListField(form.permissions);
+
+      const payload = {
+        name: trimmedName,
+        phone: trimmedPhone || null,
+        birthDate: birthDateIso,
+        responsibilities: responsibilitiesList,
+        permissions: permissionsList,
+      };
+
+      if (photoData) {
+        payload.photoURL = photoData;
+      } else if (photoCleared) {
+        payload.photoURL = null;
+      }
+
+      await setDoc(doc(db, "users", profile.uid), payload, { merge: true });
+
+      setProfile((prev) => {
+        if (!prev) return prev;
+
+        return {
+          ...prev,
+          name: trimmedName,
+          phone: trimmedPhone || null,
+          birthDate: birthDateIso ? new Date(birthDateIso) : null,
+          responsibilities: responsibilitiesList,
+          permissions: permissionsList,
+          photoURL: photoData ? photoData : photoCleared ? null : prev.photoURL,
+        };
+      });
+
+      setEditMode(false);
+      setFeedback({ type: "success", message: "Profile updated successfully." });
+    } catch (err) {
+      console.error("Failed to update admin profile", err);
+      setFeedback({ type: "error", message: "Unable to save changes right now." });
+    } finally {
+      setPhotoData("");
+      setPhotoCleared(false);
+      setSaving(false);
+    }
+  };
 
   return (
     <div className="app-shell flex min-h-screen bg-gradient-to-br from-white via-slate-50 to-white">

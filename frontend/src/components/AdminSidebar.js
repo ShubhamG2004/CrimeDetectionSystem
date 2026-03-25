@@ -11,6 +11,7 @@ import {
   ClipboardList,
   Shield,
   Building2,
+  UserCircle2,
 } from "lucide-react";
 
 export default function AdminSidebar() {
@@ -66,6 +67,18 @@ export default function AdminSidebar() {
             />
             <span className={labelClass(isActive("/dashboard/admin"))}>
               Overview
+            </span>
+          </Link>
+
+          <Link
+            href="/dashboard/admin/profile"
+            className={navItemClass(isActive("/dashboard/admin/profile"))}
+          >
+            <UserCircle2
+              className={iconClass(isActive("/dashboard/admin/profile"))}
+            />
+            <span className={labelClass(isActive("/dashboard/admin/profile"))}>
+              Profile
             </span>
           </Link>
 
