@@ -26,24 +26,32 @@ export default function PendingCamerasPage() {
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState("");
 
-  const fetchPendingCameras = async () => {
-    const snap = await getDocs(
-      query(collection(db, "cameras"), where("status", "==", "pending"))
-    );
-    const camerasData = snap.docs
-      .map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      }))
-      .sort((a, b) => {
-        const aMs = a.createdAt?.toMillis?.() || 0;
-        const bMs = b.createdAt?.toMillis?.() || 0;
-        return bMs - aMs;
-      });
+  const fetchPendingCameras = async ({ withSpinner = false } = {}) => {
+    try {
+      if (withSpinner) setLoading(true);
 
-    setCameras(camerasData);
-    console.log("📷 Camera Data:", camerasData);
-    setLoading(false);
+      const snap = await getDocs(
+        query(collection(db, "cameras"), where("status", "==", "pending"))
+      );
+      const camerasData = snap.docs
+        .map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data(),
+        }))
+        .sort((a, b) => {
+          const aMs = a.createdAt?.toMillis?.() || 0;
+          const bMs = b.createdAt?.toMillis?.() || 0;
+          return bMs - aMs;
+        });
+
+      setCameras(camerasData);
+    } catch (error) {
+      console.error("Failed to load pending cameras:", error);
+    } finally {
+      if (withSpinner) {
+        setLoading(false);
+      }
+    }
   };
 
   useEffect(() => {
@@ -54,11 +62,7 @@ export default function PendingCamerasPage() {
       if (!user) return router.replace("/login");
       if (localStorage.getItem("role") !== ROLES.ADMIN) return router.replace("/dashboard");
 
-      try {
-        await fetchPendingCameras();
-      } finally {
-        setLoading(false);
-      }
+      await fetchPendingCameras({ withSpinner: true });
     });
 
     return () => unsub();
@@ -112,6 +116,77 @@ export default function PendingCamerasPage() {
     }
   };
 
+  const handleRefresh = () => fetchPendingCameras({ withSpinner: true });
+
+  const totalPending = cameras.length;
+  const operatorIds = cameras
+    .map((cam) => cam.fieldOperatorId || cam.addedBy)
+    .filter(Boolean);
+  const operatorCount = new Set(operatorIds).size;
+  const locationGaps = cameras.filter((cam) => !(cam.location && cam.location.trim().length > 0)).length;
+  const unnamedOperators = cameras.filter(
+    (cam) => !(cam.fieldOperatorName || cam.addedByName)
+  ).length;
+  const heroCamera = cameras[0];
+  const heroOperator = heroCamera
+    ? heroCamera.fieldOperatorName || heroCamera.addedByName || "Unknown operator"
+    : null;
+  const heroLocation = heroCamera?.location || "Location pending";
+  const queueStatusLabel =
+    totalPending > 12
+      ? "High influx"
+      : totalPending > 4
+        ? "In review"
+        : totalPending > 0
+          ? "Minimal queue"
+          : "Queue cleared";
+
+  const summaryHighlights = [
+    {
+      label: "Awaiting review",
+      value: totalPending,
+      descriptor: totalPending === 1 ? "camera in queue" : "cameras in queue",
+    },
+    {
+      label: "Operators involved",
+      value: operatorCount,
+      descriptor: operatorCount === 1 ? "active operator" : "active operators",
+    },
+    {
+      label: "Missing location",
+      value: locationGaps,
+      descriptor: locationGaps === 1 ? "update needed" : "updates needed",
+    },
+    {
+      label: "Unassigned",
+      value: unnamedOperators,
+      descriptor: unnamedOperators === 1 ? "no operator listed" : "no operators listed",
+    },
+  ];
+
+  const recentActivity = cameras.slice(0, 4);
+
+  const formatRelativeTime = (timestamp) => {
+    if (!timestamp) return "Awaiting timestamp";
+    const date =
+      typeof timestamp.toDate === "function"
+        ? timestamp.toDate()
+        : new Date(timestamp);
+    if (Number.isNaN(date.getTime())) return "Awaiting timestamp";
+
+    const diffMs = Date.now() - date.getTime();
+    const diffMinutes = Math.floor(diffMs / 60000);
+
+    if (diffMinutes < 1) return "Just now";
+    if (diffMinutes < 60) return `${diffMinutes}m ago`;
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+
+    const diffDays = Math.floor(diffHours / 24);
+    return `${diffDays}d ago`;
+  };
+
   return (
     <div className="app-shell flex">
       <AdminSidebar />
@@ -139,7 +214,6 @@ export default function PendingCamerasPage() {
                 <tr>
                   <th className="p-3 text-left">Camera Name</th>
                   <th className="p-3 text-left">Location</th>
-                  <th className="p-3 text-center">IP Address</th>
                   <th className="p-3 text-center">Field Operator</th>
                   <th className="p-3 text-center">Action</th>
                 </tr>
@@ -153,9 +227,6 @@ export default function PendingCamerasPage() {
                     </td>
                     <td className="p-3">
                       {cam.location || "-"}
-                    </td>
-                    <td className="p-3 text-center">
-                      {cam.ipAddress || "-"}
                     </td>
                     <td className="p-3 text-center">
                       {cam.fieldOperatorName || cam.addedByName || "Unknown"}
