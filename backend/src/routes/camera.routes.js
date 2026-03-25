@@ -8,6 +8,7 @@ const { verifyToken, requireAdmin } = require("../middleware/auth");
    ================================ */
 router.get("/", verifyToken, async (req, res) => {
   try {
+    console.log("📸 Fetching cameras for user:", req.user?.uid);
     const snapshot = await db.collection("cameras").get();
 
     const cameras = snapshot.docs.map((doc) => ({
@@ -15,12 +16,18 @@ router.get("/", verifyToken, async (req, res) => {
       ...doc.data(),
     }));
 
+    console.log(`✅ Found ${cameras.length} cameras`);
     res.status(200).json(cameras);
   } catch (err) {
-    console.error("FETCH CAMERAS ERROR:", err);
+    console.error("❌ FETCH CAMERAS ERROR:", {
+      message: err.message,
+      code: err.code,
+      stack: err.stack,
+    });
     res.status(500).json({
       success: false,
       message: "Failed to fetch cameras",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
   }
 });

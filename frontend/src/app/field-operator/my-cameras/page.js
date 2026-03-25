@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, getDocs, query, where } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { ROLES } from "@/lib/roles";
 import Navbar from "@/components/Navbar";
 import FieldOperatorSidebar from "@/components/FieldOperatorSidebar";

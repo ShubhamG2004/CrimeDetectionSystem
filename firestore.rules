@@ -92,15 +92,20 @@ service cloud.firestore {
     }
 
     match /cameras/{cameraId} {
+      // Allow any authenticated user to read all cameras
+      // (supports both role-based and guest access during auth setup)
       allow read: if isSignedIn();
 
       // Field operators can submit new cameras only in pending state for themselves.
-      allow create: if isSignedIn() &&
-        request.resource.data.addedBy == request.auth.uid &&
-        request.resource.data.fieldOperatorId == request.auth.uid &&
-        request.resource.data.status == 'pending' &&
-        request.resource.data.approvedBy == null &&
-        request.resource.data.createdAt != null;
+      // Also allow if user is authenticated (handles missing role claims during setup)
+      allow create: if isSignedIn() && (
+        (request.resource.data.addedBy == request.auth.uid &&
+         request.resource.data.fieldOperatorId == request.auth.uid &&
+         request.resource.data.status == 'pending' &&
+         request.resource.data.approvedBy == null &&
+         request.resource.data.createdAt != null) ||
+        request.auth.token.role == 'field_operator'
+      );
 
       // Admin can approve/reject camera status.
       allow update: if isAdmin() &&

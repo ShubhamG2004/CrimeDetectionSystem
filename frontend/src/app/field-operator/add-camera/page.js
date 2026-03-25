@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, doc, getDoc, getDocs, query, serverTimestamp, setDoc, where } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import dynamic from "next/dynamic";
 import { auth, db } from "@/lib/firebase";
 import { ROLES } from "@/lib/roles";
@@ -192,8 +192,7 @@ export default function FieldOperatorAddCameraPage() {
     setLoading(true);
 
     try {
-      // Refresh claims before Firestore write (role updates can lag on cached tokens).
-      await auth.currentUser.getIdToken(true);
+      const token = await auth.currentUser.getIdToken(true);
 
       const payload = {
         cameraName: form.cameraName.trim(),
@@ -203,25 +202,27 @@ export default function FieldOperatorAddCameraPage() {
         policeStationId: form.policeStationId,
         policeStationName: selectedStationName,
         description: form.description.trim(),
-        fieldOperatorId: auth.currentUser.uid,
-        addedBy: auth.currentUser.uid,
-        status: "pending",
-        approvedBy: null,
-        createdAt: serverTimestamp(),
-
-        // Backward-compatible fields used by existing routes/services.
-        name: form.cameraName.trim(),
-        area: form.location.trim(),
-        active: false,
       };
 
-      const cameraRef = doc(collection(db, "cameras"));
-      await setDoc(cameraRef, {
-        ...payload,
-        cameraId: cameraRef.id,
+      // Use backend API instead of direct Firestore write
+      const response = await fetch("http://localhost:5000/api/operator/submit-camera", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
       });
 
-      setMessage("Camera submitted successfully. Waiting for admin approval.");
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(
+          data.message || `HTTP ${response.status}: Failed to submit camera`
+        );
+      }
+
+      setMessage("✅ Camera submitted successfully. Waiting for admin approval.");
       setForm({
         cameraName: "",
         location: "",
@@ -230,9 +231,29 @@ export default function FieldOperatorAddCameraPage() {
         policeStationId: "",
         description: "",
       });
+
+      // Optionally redirect to my-cameras after success
+      setTimeout(() => {
+        router.push("/field-operator/my-cameras");
+      }, 1500);
     } catch (error) {
       console.error("Failed to submit camera:", error);
-      setMessage("Failed to submit camera. Please try again.");
+
+      const isPermissionError =
+        error?.message?.includes("permission") ||
+        error?.message?.includes("403");
+
+      if (isPermissionError) {
+        setMessage(
+          "❌ Permission denied. Your account may not have the field_operator role set. Contact your admin."
+        );
+      } else if (error?.message?.includes("Police station")) {
+        setMessage("❌ Selected police station is not available to you.");
+      } else {
+        setMessage(
+          error?.message || "Failed to submit camera. Please try again."
+        );
+      }
     } finally {
       setLoading(false);
     }

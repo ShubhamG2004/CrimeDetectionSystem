@@ -7,6 +7,7 @@ const incidentRoutes = require("./routes/incident.routes");
 const cameraRoutes = require("./routes/camera.routes");
 const adminRoutes = require("./routes/admin.routes");
 const detectRoutes = require("./routes/detect.routes");
+const { db } = require("./config/firebase");
 
 const app = express();
 
@@ -21,6 +22,20 @@ app.get("/", (req, res) => {
   res.send("Crime Detection Backend Running 🚓");
 });
 
+app.get("/health", async (req, res) => {
+  try {
+    const result = await db.collection("cameras").limit(1).get();
+    res.json({ status: "ok", firebase: "connected", timestamp: new Date().toISOString() });
+  } catch (err) {
+    console.error("Health check failed:", err.message);
+    res.status(503).json({ 
+      status: "error", 
+      firebase: "disconnected", 
+      error: err.message,
+      timestamp: new Date().toISOString()
+    });
+  }
+});
 
 app.use("/api/cameras", cameraRoutes);
 
