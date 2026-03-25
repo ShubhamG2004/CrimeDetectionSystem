@@ -25,7 +25,6 @@ export default function PendingCamerasPage() {
   const [cameras, setCameras] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoadingId, setActionLoadingId] = useState("");
-  const [operatorNamesMap, setOperatorNamesMap] = useState({});
 
   const fetchPendingCameras = async () => {
     const snap = await getDocs(
@@ -43,38 +42,8 @@ export default function PendingCamerasPage() {
       });
 
     setCameras(camerasData);
-
-    // Fetch operator names for all unique addedBy UIDs
-    const operatorIds = [...new Set(camerasData.map((cam) => cam.addedBy).filter(Boolean))];
-    const namesMap = {};
-
-    for (const uid of operatorIds) {
-      try {
-        // Try field_operator collection first
-        let userDoc = await getDoc(doc(db, "field_operator", uid));
-        
-        // Try operators collection if not found
-        if (!userDoc.exists()) {
-          userDoc = await getDoc(doc(db, "operators", uid));
-        }
-        
-        // Try users collection as fallback
-        if (!userDoc.exists()) {
-          userDoc = await getDoc(doc(db, "users", uid));
-        }
-        
-        if (userDoc.exists()) {
-          namesMap[uid] = userDoc.data().name || userDoc.data().displayName || "Unknown";
-        } else {
-          namesMap[uid] = "Unknown";
-        }
-      } catch (error) {
-        console.error(`Failed to fetch operator name for ${uid}:`, error);
-        namesMap[uid] = "Unknown";
-      }
-    }
-
-    setOperatorNamesMap(namesMap);
+    console.log("📷 Camera Data:", camerasData);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -95,18 +64,45 @@ export default function PendingCamerasPage() {
     return () => unsub();
   }, [router]);
 
-  const updateCameraStatus = async (cameraId, nextStatus) => {
+  const updateCameraStatus = async (camera, nextStatus) => {
+    const cameraId = camera.id;
     if (!auth.currentUser) return;
 
     try {
       setActionLoadingId(cameraId);
-      await updateDoc(doc(db, "cameras", cameraId), {
+      const updates = {
         status: nextStatus,
-        approvedBy: nextStatus === "approved" ? auth.currentUser.uid : null,
-        active: nextStatus === "approved",
-        approvedAt: nextStatus === "approved" ? serverTimestamp() : null,
         updatedAt: serverTimestamp(),
-      });
+      };
+
+      if (nextStatus === "approved") {
+        const operatorUid = camera.fieldOperatorId || camera.addedBy;
+        let operatorName = camera.fieldOperatorName || camera.addedByName || "Unknown";
+
+        if (!camera.fieldOperatorName && operatorUid) {
+          try {
+            const operatorDoc = await getDoc(doc(db, "field_operator", operatorUid));
+            if (operatorDoc.exists()) {
+              operatorName = operatorDoc.data().name || operatorName;
+            }
+          } catch (fetchError) {
+            console.error("Failed to fetch operator name during approval:", fetchError);
+          }
+        }
+
+        updates.approvedBy = auth.currentUser.uid;
+        updates.approvedByName = auth.currentUser.displayName || auth.currentUser.email || "Administrator";
+        updates.fieldOperatorName = operatorName;
+        updates.active = true;
+        updates.approvedAt = serverTimestamp();
+      } else {
+        updates.approvedBy = null;
+        updates.approvedByName = null;
+        updates.active = false;
+        updates.approvedAt = null;
+      }
+
+      await updateDoc(doc(db, "cameras", cameraId), updates);
       await fetchPendingCameras();
     } catch (error) {
       console.error("Failed to update camera status:", error);
@@ -152,20 +148,28 @@ export default function PendingCamerasPage() {
               <tbody className="text-slate-800 text-sm">
                 {!loading && cameras.map((cam) => (
                   <tr key={cam.id} className="border-t border-slate-100 hover:bg-slate-50/70">
-                    <td className="p-3 font-medium">{cam.cameraName || cam.name}</td>
-                    <td className="p-3">{cam.location || cam.area || "-"}</td>
-                    <td className="p-3 text-center">{cam.ipAddress || "-"}</td>
-                    <td className="p-3 text-center">{operatorNamesMap[cam.addedBy] || "Unknown"}</td>
+                    <td className="p-3 font-medium">
+                      {cam.cameraName || cam.name || "-"}
+                    </td>
+                    <td className="p-3">
+                      {cam.location || "-"}
+                    </td>
+                    <td className="p-3 text-center">
+                      {cam.ipAddress || "-"}
+                    </td>
+                    <td className="p-3 text-center">
+                      {cam.fieldOperatorName || cam.addedByName || "Unknown"}
+                    </td>
                     <td className="p-3 text-center space-x-2">
                       <button
-                        onClick={() => updateCameraStatus(cam.id, "approved")}
+                        onClick={() => updateCameraStatus(cam, "approved")}
                         disabled={actionLoadingId === cam.id}
                         className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs rounded disabled:opacity-60"
                       >
                         Approve
                       </button>
                       <button
-                        onClick={() => updateCameraStatus(cam.id, "rejected")}
+                        onClick={() => updateCameraStatus(cam, "rejected")}
                         disabled={actionLoadingId === cam.id}
                         className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs rounded disabled:opacity-60"
                       >

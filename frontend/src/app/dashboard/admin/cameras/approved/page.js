@@ -85,10 +85,10 @@ export default function ApprovedCamerasPage() {
                   <tr key={cam.id} className="border-t border-slate-100 hover:bg-slate-50/70">
                     <td className="p-3 font-medium">{cam.cameraName || cam.name}</td>
                     <td className="p-3">{cam.location || cam.area || "-"}</td>
-                    <td className="p-3">{cam.addedBy || "-"}</td>
+                    <td className="p-3">{cam.fieldOperatorName || "Unknown"}</td>
                     <td className="p-3 text-center">{cam.latitude ?? "-"}</td>
                     <td className="p-3 text-center">{cam.longitude ?? "-"}</td>
-                    <td className="p-3 text-center">{cam.approvedBy || "-"}</td>
+                    <td className="p-3 text-center">{cam.approvedByName || cam.approvedBy || "-"}</td>
                   </tr>
                 ))}
               </tbody>
