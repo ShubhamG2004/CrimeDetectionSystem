@@ -95,6 +95,26 @@ def calculate_response_time(start_time):
     return round((datetime.now() - start_time).total_seconds() * 1000, 2)
 
 
+def is_real_threat(detection):
+    """Context filter to suppress isolated weapon motions without victims"""
+    if not isinstance(detection, dict):
+        return False
+
+    activities = detection.get("activities") or []
+    persons = int(detection.get("persons_detected") or 0)
+
+    weapon_activities = {"STABBING_ATTACK", "WEAPON_THREAT", "ARMED_THREAT", "SHOOTING_THREAT"}
+    has_weapon_activity = any(activity in weapon_activities for activity in activities)
+
+    if persons < 2 and has_weapon_activity:
+        return False
+
+    if "STABBING_ATTACK" in activities and "PHYSICAL_ASSAULT" not in activities:
+        return False
+
+    return True
+
+
 # --------------------------------------------------
 # CORE ANALYSIS
 # --------------------------------------------------

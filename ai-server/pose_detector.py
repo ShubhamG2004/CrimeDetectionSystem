@@ -3,6 +3,28 @@ import numpy as np
 import math
 from collections import defaultdict
 
+SINGLE_PERSON_WEAPON_SIGNALS = {
+    "STABBING_MOTION_LEFT",
+    "STABBING_MOTION_RIGHT",
+    "KNIFE_WIELDING_LEFT",
+    "KNIFE_WIELDING_RIGHT",
+    "WEAPON_THREAT_LEFT",
+    "WEAPON_THREAT_RIGHT",
+}
+
+SINGLE_PERSON_WEAPON_ACTIVITIES = {
+    "STABBING_ATTACK",
+    "WEAPON_THREAT",
+    "ARMED_THREAT",
+    "SHOOTING_THREAT",
+}
+
+SINGLE_PERSON_SEXUAL_MARKERS = {
+    "SEXUAL_ASSAULT_SIGNAL",
+    "MOLESTATION_SIGNAL",
+    "HARASSMENT_SIGNAL",
+}
+
 class PoseCrimeDetector:
     def __init__(self):
         # Use medium model for better accuracy or keep nano for speed
@@ -66,6 +88,22 @@ class PoseCrimeDetector:
             signals.extend(inter_signals)
             activities.extend(inter_acts)
         
+        if persons < 2:
+            filtered_signals = [
+                sig
+                for sig in signals
+                if sig not in SINGLE_PERSON_WEAPON_SIGNALS and "SEXUAL" not in sig
+            ]
+            filtered_activities = [
+                act
+                for act in activities
+                if act not in SINGLE_PERSON_WEAPON_ACTIVITIES
+                and act not in SINGLE_PERSON_SEXUAL_MARKERS
+                and "SEXUAL" not in act
+            ]
+            signals = filtered_signals
+            activities = filtered_activities
+
         # ---- TEMPORAL ANALYSIS (Improved) ----
         self._update_history(signals)
         temporal_signals = self._temporal_analysis()
@@ -843,7 +881,7 @@ class PoseCrimeDetector:
                 return "Armed Assault / Weapon Attack", "CRITICAL"
         
         # Stabbing (knife-specific)
-        if has_stabbing and (has_assault_signal or has_physical_contact):
+        if has_stabbing and has_physical_contact and persons >= 2:
             return "Stabbing Attack", "CRITICAL"
         
         # Shootout / Gun Threat (multiple persons with guns)
