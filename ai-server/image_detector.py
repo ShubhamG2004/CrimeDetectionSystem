@@ -139,7 +139,15 @@ def analyze_image(image):
         
         # Run detection
         result = pose_detector.analyze(processed_image)
-        
+        real_threat = is_real_threat(result)
+
+        if not real_threat:
+            result["crime_detected"] = False
+            result["threat_level"] = "LOW"
+            result["crime_type"] = "Normal (Filtered)"
+            result["type"] = "Normal (Filtered)"
+            result["threat_score"] = min(result.get("threat_score", 0) or 0, 20)
+
         confidence = normalize_confidence(
             result.get("confidence", 0.0)
         )
@@ -147,7 +155,7 @@ def analyze_image(image):
         crime_type = result.get("crime_type", "NO_CRIME")
 
         # 🔥 FIX: violent crimes are crimes even with moderate confidence
-        crime_detected = (
+        crime_detected = real_threat and (
             result.get("crime_detected", False)
             or crime_type in [
                 "Fight / Physical Violence",
@@ -163,7 +171,7 @@ def analyze_image(image):
         return {
             "type": crime_type,
             "confidence": confidence,
-            "crime_detected": int(crime_detected),
+            "crime_detected": bool(crime_detected),
             "threat_level": result.get("threat_level", "LOW"),
             "persons_detected": int(result.get("persons_detected", 0)),
             "activities": result.get("activities", []),
