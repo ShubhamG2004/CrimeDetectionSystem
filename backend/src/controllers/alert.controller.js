@@ -61,15 +61,17 @@ exports.updateAlertStatus = async (req, res) => {
       return res.status(404).json({ success: false, message: "Alert not found" });
     }
 
+    const historyEntry = {
+      status: normalized,
+      notes: notes || null,
+      changedBy: req.user?.uid || "system",
+      changedAt: admin.firestore.Timestamp.now(),
+    };
+
     const updatePayload = {
       status: normalized,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      statusHistory: admin.firestore.FieldValue.arrayUnion({
-        status: normalized,
-        notes: notes || null,
-        changedBy: req.user?.uid || "system",
-        changedAt: admin.firestore.FieldValue.serverTimestamp(),
-      }),
+      statusHistory: admin.firestore.FieldValue.arrayUnion(historyEntry),
     };
 
     if (notes) {
@@ -86,5 +88,50 @@ exports.updateAlertStatus = async (req, res) => {
   } catch (err) {
     console.error("updateAlertStatus error:", err.message);
     res.status(500).json({ success: false, message: "Failed to update alert" });
+  }
+};
+
+exports.acknowledgeAlert = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const alertRef = db.collection(COLLECTION).doc(id);
+    const snapshot = await alertRef.get();
+
+    if (!snapshot.exists) {
+      return res.status(404).json({ success: false, message: "Alert not found" });
+    }
+
+    const historyEntry = {
+      status: ALERT_STATUS.ACKNOWLEDGED,
+      notes: req.body?.notes || null,
+      changedBy: req.user?.uid || "ack-endpoint",
+      changedAt: admin.firestore.Timestamp.now(),
+    };
+
+    await alertRef.update({
+      status: ALERT_STATUS.ACKNOWLEDGED,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      statusHistory: admin.firestore.FieldValue.arrayUnion(historyEntry),
+    });
+
+    res.status(200).json({ success: true, message: "Alert acknowledged" });
+  } catch (err) {
+    console.error("acknowledgeAlert error:", err.message);
+    res.status(500).json({ success: false, message: "Failed to acknowledge alert" });
+  }
+};
+
+exports.handleAlertWebhook = async (req, res) => {
+  try {
+    const bodyContent = (req.body?.Body || "").toString().trim();
+
+    if (bodyContent.toLowerCase().includes("ack")) {
+      console.log("ACK received from police");
+    }
+
+    res.status(200).send("OK");
+  } catch (err) {
+    console.error("handleAlertWebhook error:", err.message);
+    res.status(500).send("Error");
   }
 };

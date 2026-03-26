@@ -49,6 +49,87 @@ const calculateThreatScore = ({ confidence = 0, threat_level = "LOW" }) => {
 };
 
 /* --------------------------------------------------
+   🧠 Helper: Contextual Threat Filtering
+-------------------------------------------------- */
+const THREAT_KEYWORDS = {
+  weaponSignals: ["GUN", "KNIFE", "STABBING", "WEAPON"],
+  violentActivities: ["PHYSICAL_ASSAULT", "SHOOTING_THREAT", "STABBING_ATTACK", "WEAPON_THREAT"],
+  suspiciousActivities: ["FOLLOWING_CHASING", "ARMED_THREAT"],
+};
+
+const LOCATION_FALSE_POSITIVE_KEYWORDS = ["MARKET", "FISH", "SEAFOOD"];
+
+const toUpperSafe = (value) => String(value || "").toUpperCase();
+
+const sanitizeSignals = (signals = []) => {
+  if (!Array.isArray(signals)) return [];
+  return signals
+    .filter(Boolean)
+    .filter((signal) => !toUpperSafe(signal).includes("SEXUAL ASSAULT"));
+};
+
+const includesKeyword = (items = [], keywords = []) => {
+  if (!Array.isArray(items) || !items.length || !keywords.length) return false;
+  const upperItems = items.map((item) => toUpperSafe(item));
+  return upperItems.some((item) => keywords.some((keyword) => item.includes(keyword)));
+};
+
+const evaluateThreatContext = ({
+  signals = [],
+  activities = [],
+  confidence = 0,
+  locationName = "",
+}) => {
+  const sanitizedSignals = sanitizeSignals(signals);
+  const normalizedActivities = Array.isArray(activities)
+    ? activities.filter(Boolean)
+    : [];
+
+  const reasons = [];
+
+  const hasWeapon = includesKeyword(sanitizedSignals, THREAT_KEYWORDS.weaponSignals);
+  const hasViolentContext = includesKeyword(normalizedActivities, THREAT_KEYWORDS.violentActivities);
+  const hasSuspiciousContext = includesKeyword(
+    normalizedActivities,
+    THREAT_KEYWORDS.suspiciousActivities
+  );
+
+  if (!hasWeapon) {
+    reasons.push("no-weapon-detected");
+  }
+
+  if (hasWeapon && !hasViolentContext && !hasSuspiciousContext) {
+    reasons.push("weapon-without-context");
+  }
+
+  const lowConfidence = Number(confidence) < 0.95;
+  if (lowConfidence) {
+    reasons.push("confidence-below-0.95");
+  }
+
+  const locationLabel = toUpperSafe(locationName);
+  const filteredLocation = LOCATION_FALSE_POSITIVE_KEYWORDS.some((keyword) =>
+    locationLabel.includes(keyword)
+  );
+
+  if (filteredLocation) {
+    reasons.push("filtered-location");
+  }
+
+  const isRealThreat =
+    hasWeapon &&
+    (hasViolentContext || hasSuspiciousContext) &&
+    !lowConfidence &&
+    !filteredLocation;
+
+  return {
+    isRealThreat,
+    sanitizedSignals,
+    reasons: isRealThreat ? [] : reasons,
+  };
+};
+
+/* --------------------------------------------------
    📥 IMAGE DETECTION ROUTE
 -------------------------------------------------- */
 router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
@@ -166,6 +247,23 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
       persons_detected,
     });
 
+    const {
+      isRealThreat,
+      sanitizedSignals,
+      reasons: suppressionReasons,
+    } = evaluateThreatContext({
+      signals,
+      activities,
+      confidence,
+      locationName: location.name,
+    });
+
+    if (!isRealThreat) {
+      console.log("⚠️ Context filter suppressed alert", {
+        suppressionReasons,
+      });
+    }
+
     /* ---------- THREAT SCORE ---------- */
     const threat_score = calculateThreatScore({
       confidence,
@@ -193,7 +291,7 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
 
       persons_detected: Number(persons_detected) || 0,
       activities,
-      signals,
+      signals: sanitizedSignals,
 
       location, // ✅ ALWAYS CONSISTENT
 
@@ -203,6 +301,11 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       aiTimestamp: timestamp,
+      contextFilter: {
+        suppressed: !isRealThreat,
+        reasons: suppressionReasons,
+        evaluatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
     };
 
     const docRef = await db.collection("incidents").add(incidentData);
@@ -240,6 +343,7 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
     }
 
     if (
+      isRealThreat &&
       shouldTriggerAlert({
         threat_level,
         threat_score,
@@ -258,6 +362,8 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
       } catch (alertErr) {
         console.error("Alert dispatch error:", alertErr.message);
       }
+    } else if (!isRealThreat) {
+      console.log("ℹ️ Incident stored but alert suppressed");
     }
 
     return res.status(201).json({

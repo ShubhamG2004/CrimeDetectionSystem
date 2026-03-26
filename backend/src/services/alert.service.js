@@ -12,10 +12,16 @@ const ALERT_STATUS = {
 const HIGH_RISK_LEVELS = new Set(["HIGH", "CRITICAL"]);
 const SCORE_THRESHOLD = Number(process.env.ALERT_SCORE_THRESHOLD || 70);
 
+const TWILIO_CHANNEL = (process.env.TWILIO_CHANNEL || "whatsapp").toLowerCase();
+const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
+const TWILIO_TEST_NUMBER = process.env.TWILIO_TEST_NUMBER || "+917057652014";
+const MAX_RETRIES = 3;
+const RETRY_DELAY = 3 * 60 * 1000; // 3 minutes
+
 const hasTwilioConfig =
   Boolean(process.env.TWILIO_ACCOUNT_SID) &&
   Boolean(process.env.TWILIO_AUTH_TOKEN) &&
-  Boolean(process.env.TWILIO_FROM_NUMBER);
+  Boolean(TWILIO_FROM_NUMBER);
 
 const smsClient = hasTwilioConfig
   ? twilio(
@@ -116,51 +122,73 @@ const createAlertPayload = ({
   triggeredAt: admin.firestore.FieldValue.serverTimestamp(),
   lastNotificationAt: null,
   deliveryLog: [],
-  statusHistory: [
-    {
-      status: ALERT_STATUS.PENDING,
-      changedBy: "system",
-      reason: "auto-alert",
-      changedAt: admin.firestore.FieldValue.serverTimestamp(),
-    },
-  ],
+  statusHistory: [],
+  retryCount: 0,
 });
+
+const formatTwilioAddress = (number) => {
+  if (!number) return null;
+
+  let clean = number.replace("whatsapp:", "").trim();
+
+  if (!clean.startsWith("+")) {
+    clean = "+91" + clean;
+  }
+
+  return `whatsapp:${clean}`;
+};
 
 const sendSmsAlert = async ({ alertDoc, stationMeta }) => {
   if (!smsClient) {
     return {
-      channel: "sms",
+      channel: TWILIO_CHANNEL,
       status: "skipped",
       reason: "Twilio is not configured",
     };
   }
-  if (!stationMeta?.contactNumber) {
+
+  const toNumber = stationMeta?.contactNumber || TWILIO_TEST_NUMBER;
+  const formattedTo = formatTwilioAddress(toNumber);
+  const formattedFrom = formatTwilioAddress(TWILIO_FROM_NUMBER);
+
+  if (!formattedTo || !formattedFrom) {
     return {
-      channel: "sms",
+      channel: TWILIO_CHANNEL,
       status: "skipped",
-      reason: "Station contact number unavailable",
+      reason: "Messaging addresses unavailable",
     };
   }
 
-  const message =
-    `CRITICAL ALERT: ${alertDoc.crime_type} detected at ${alertDoc.location?.name || alertDoc.camera?.name}` +
-    ` | Threat: ${alertDoc.threat_level} (${alertDoc.threat_score}) | Incident ${alertDoc.incidentId}`;
+  const locationLabel = alertDoc.location?.name || alertDoc.camera?.name || "Unknown Location";
+  const messageBody =
+    "\uD83D\uDEA8 CRIME ALERT \uD83D\uDEA8\n\n" +
+    `Location: ${locationLabel}\n` +
+    `Camera: ${alertDoc.camera?.id || "N/A"}\n` +
+    `Crime: ${alertDoc.crime_type || "Unknown"}\n` +
+    `Threat: ${alertDoc.threat_level || "LOW"} (score ${alertDoc.threat_score || 0})\n` +
+    `Time: ${new Date().toLocaleString()}\n\n` +
+    "Take immediate action.";
+
+  console.log("Sending WhatsApp Alert...");
+  console.log("FROM:", formattedFrom);
+  console.log("TO:", formattedTo);
 
   try {
     await smsClient.messages.create({
-      body: message,
-      from: process.env.TWILIO_FROM_NUMBER,
-      to: stationMeta.contactNumber,
+      from: formattedFrom,
+      to: formattedTo,
+      body: messageBody,
     });
+    console.log("✅ WhatsApp message sent");
     return {
-      channel: "sms",
+      channel: TWILIO_CHANNEL,
       status: "delivered",
       timestamp: new Date().toISOString(),
     };
   } catch (err) {
-    console.error("SMS alert failed:", err.message);
+    console.error("❌ WhatsApp send failed:", err.message);
     return {
-      channel: "sms",
+      channel: TWILIO_CHANNEL,
       status: "failed",
       error: err.message,
     };
@@ -226,6 +254,58 @@ const dispatchDeliveries = async ({ alertDoc, stationMeta }) => {
   return logs;
 };
 
+const scheduleRetry = (alertId) => {
+  setTimeout(async () => {
+    try {
+      const docRef = db.collection(ALERT_COLLECTION).doc(alertId);
+      const doc = await docRef.get();
+
+      if (!doc.exists) {
+        return;
+      }
+
+      const alert = doc.data();
+
+      if (alert.status === ALERT_STATUS.ACKNOWLEDGED) {
+        console.log("✅ Alert already acknowledged. No retry needed.");
+        return;
+      }
+
+      const retryCount = alert.retryCount || 0;
+
+      if (retryCount >= MAX_RETRIES) {
+        console.log("❌ Max retries reached. Stopping.");
+        return;
+      }
+
+      console.log(`🔁 Retrying alert (${retryCount + 1})...`);
+
+      const deliveryLog = await dispatchDeliveries({
+        alertDoc: { id: alertId, ...alert },
+        stationMeta: alert.station,
+      });
+
+      const updatePayload = {
+        retryCount: retryCount + 1,
+        lastNotificationAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      if (deliveryLog?.length) {
+        updatePayload.deliveryLog = admin.firestore.FieldValue.arrayUnion(
+          ...deliveryLog
+        );
+      }
+
+      await docRef.update(updatePayload);
+
+      scheduleRetry(alertId);
+    } catch (err) {
+      console.error("Retry failed:", err.message);
+    }
+  }, RETRY_DELAY);
+};
+
 const triggerStationAlert = async ({
   incidentId,
   incidentData,
@@ -259,10 +339,26 @@ const triggerStationAlert = async ({
   });
 
   const docRef = await db.collection(ALERT_COLLECTION).add(alertPayload);
-  const storedAlert = { id: docRef.id, ...alertPayload };
-  const deliveryLog = await dispatchDeliveries({ alertDoc: storedAlert, stationMeta });
+  const baseAlert = { id: docRef.id, ...alertPayload };
+  const deliveryLog = await dispatchDeliveries({ alertDoc: baseAlert, stationMeta });
+
+  if (io) {
+    deliveryLog.push({
+      channel: "dashboard",
+      status: "emitted",
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  const pendingEntry = {
+    status: ALERT_STATUS.PENDING,
+    changedBy: "system",
+    reason: "auto-alert",
+    changedAt: admin.firestore.Timestamp.now(),
+  };
 
   await docRef.update({
+    statusHistory: [pendingEntry],
     deliveryLog,
     lastNotificationAt: deliveryLog.length
       ? admin.firestore.FieldValue.serverTimestamp()
@@ -270,7 +366,13 @@ const triggerStationAlert = async ({
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
 
-  const enrichedAlert = { ...storedAlert, deliveryLog };
+  scheduleRetry(docRef.id);
+
+  const enrichedAlert = {
+    ...baseAlert,
+    deliveryLog,
+    statusHistory: [pendingEntry],
+  };
 
   if (io) {
     io.emit("alert:created", enrichedAlert);
