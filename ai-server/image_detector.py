@@ -40,6 +40,15 @@ except Exception as e:
     print(f"❌ Error initializing detector: {e}")
     pose_detector = None
 
+# Initialize weapon detection model
+try:
+    from ultralytics import YOLO
+    weapon_model = YOLO("yolov8n.pt")
+    print("✅ Weapon Detection Model (YOLOv8n) initialized successfully")
+except Exception as e:
+    print(f"❌ Error initializing weapon model: {e}")
+    weapon_model = None
+
 # --------------------------------------------------
 # HELPERS
 # --------------------------------------------------
@@ -90,29 +99,71 @@ def preprocess_image(image):
     return image
 
 
+def detect_weapons(image):
+    """
+    🔫 Weapon Detection using YOLOv8n
+    Returns list of detected weapon types
+    """
+    if weapon_model is None:
+        return []
+    
+    try:
+        results = weapon_model(image, conf=0.35, verbose=False)[0]
+        
+        weapons = []
+        weapon_classes = ["knife", "gun", "sword", "rifle", "handgun", "pistol", "bottle"]
+        
+        for cls_idx in results.boxes.cls:
+            try:
+                label = results.names[int(cls_idx)].lower()
+                if any(weapon_word in label for weapon_word in weapon_classes):
+                    weapons.append(label)
+            except (IndexError, KeyError):
+                pass
+        
+        return weapons
+    except Exception as e:
+        print(f"⚠️ Weapon detection error: {e}")
+        return []
+
+
 def calculate_response_time(start_time):
     """Calculate response time in milliseconds"""
     return round((datetime.now() - start_time).total_seconds() * 1000, 2)
 
 
 def is_real_threat(detection):
-    """Context filter to suppress isolated weapon motions without victims"""
+    """Final threat filter combining persons, activities, and threat score.
+
+    NEVER rely only on person count:
+      - Multi-person (2+) ⇒ generally treat as real threat
+      - Single-person strong aggression ⇒ allow
+      - Very high threat score ⇒ allow even if counts are imperfect
+    """
     if not isinstance(detection, dict):
         return False
 
     activities = detection.get("activities") or []
     persons = int(detection.get("persons_detected") or 0)
+    threat_score = float(detection.get("threat_score") or 0)
 
-    weapon_activities = {"STABBING_ATTACK", "WEAPON_THREAT", "ARMED_THREAT", "SHOOTING_THREAT"}
-    has_weapon_activity = any(activity in weapon_activities for activity in activities)
+    # ✅ 1) Multi-person: assume real interaction (fight, assault, etc.)
+    if persons >= 2:
+        return True
 
-    if persons < 2 and has_weapon_activity:
-        return False
+    # ✅ 2) Single-person but clearly aggressive motions
+    aggressive_markers = [
+        "KICKING_MOTION",
+        "AGGRESSIVE_GESTURE",
+    ]
+    if persons == 1 and any(a in activities for a in aggressive_markers):
+        return True
 
-    if "STABBING_ATTACK" in activities and "PHYSICAL_ASSAULT" not in activities:
-        return False
+    # ✅ 3) Very high threat score from pose logic
+    if threat_score > 70:
+        return True
 
-    return True
+    return False
 
 
 # --------------------------------------------------
@@ -120,13 +171,14 @@ def is_real_threat(detection):
 # --------------------------------------------------
 def analyze_image(image):
     """
-    Runs pose-based crime detection with preprocessing
+    🔥 COMPLETE CRIME DETECTION PIPELINE
+    Pose → Weapon Detection → Final Decision Engine
     """
     if pose_detector is None:
         return {
             "type": "SYSTEM_ERROR",
             "confidence": 0.0,
-            "crime_detected": 0,
+            "crime_detected": False,
             "threat_level": "LOW",
             "persons_detected": 0,
             "activities": [],
@@ -134,57 +186,85 @@ def analyze_image(image):
         }
     
     try:
-        # Preprocess image
+        # 1️⃣ PREPROCESS IMAGE
         processed_image = preprocess_image(image)
         
-        # Run detection
+        # 2️⃣ RUN POSE DETECTION
         result = pose_detector.analyze(processed_image)
+        
+        # 3️⃣ DETECT WEAPONS (Game changer!)
+        weapons = detect_weapons(processed_image)
+        
+        # 4️⃣ APPLY IS_REAL_THREAT FILTER
         real_threat = is_real_threat(result)
-
-        if not real_threat:
+        
+        # 5️⃣ FINAL DECISION ENGINE
+        persons = result.get("persons_detected", 0)
+        confidence = result.get("confidence", 0.0)
+        threat_score = result.get("threat_score", 0)
+        
+        # 🔫 WEAPON OVERRIDE - Highest priority!
+        if len(weapons) > 0 and persons >= 2:
+            result["crime_detected"] = True
+            result["threat_level"] = "CRITICAL"
+            result["crime_type"] = "Armed Threat - Weapon Detected"
+            result["type"] = "Armed Threat - Weapon Detected"
+            threat_score = min(100, threat_score + 40)  # Massive boost
+        # 🚨 REAL THREAT - Honor pose analysis
+        elif real_threat:
+            result["crime_detected"] = True
+            # Keep threat level from pose detection
+            # Ensure type is set (might come from crime_type)
+            if "type" not in result:
+                result["type"] = result.get("crime_type", "Violent Activity")
+        # ✅ FALSE POSITIVE FILTER - Remove noise
+        else:
             result["crime_detected"] = False
             result["threat_level"] = "LOW"
             result["crime_type"] = "Normal (Filtered)"
             result["type"] = "Normal (Filtered)"
-            result["threat_score"] = min(result.get("threat_score", 0) or 0, 20)
-
-        confidence = normalize_confidence(
-            result.get("confidence", 0.0)
-        )
-
-        crime_type = result.get("crime_type", "NO_CRIME")
-
-        # 🔥 FIX: violent crimes are crimes even with moderate confidence
-        crime_detected = real_threat and (
-            result.get("crime_detected", False)
-            or crime_type in [
-                "Fight / Physical Violence",
-                "Physical Assault",
-                "Assault on Fallen Victim",
-                "Choking / Attempted Murder",
-                "Assault with Weapon",
-                "Kidnapping / Abduction",
-                "Crowd Violence / Riot"
-            ]
-        )
+            threat_score = min(20, threat_score)
         
-        return {
-            "type": crime_type,
-            "confidence": confidence,
-            "crime_detected": bool(crime_detected),
-            "threat_level": result.get("threat_level", "LOW"),
-            "persons_detected": int(result.get("persons_detected", 0)),
-            "activities": result.get("activities", []),
-            "signals": result.get("signals", []),
-            "threat_score": result.get("threat_score", 0),
-            "raw_confidence": result.get("confidence", 0.0),
-        }
+        # 6️⃣ IMPROVE THREAT SCORING WITH WEAPONS
+        if len(weapons) > 0:
+            threat_score = min(100, threat_score + 30)
+        
+        if persons >= 2:
+            threat_score = min(100, threat_score + 20)
+        
+        # 7️⃣ FINALIZE THREAT LEVEL BASED ON SCORE
+        threat_score = min(100, max(0, threat_score))
+        
+        if threat_score >= 80:
+            result["threat_level"] = "CRITICAL"
+        elif threat_score >= 60:
+            result["threat_level"] = "HIGH"
+        elif threat_score >= 30:
+            result["threat_level"] = "MEDIUM"
+        else:
+            result["threat_level"] = "LOW"
+        
+        # Ensure crime_detected is boolean
+        result["crime_detected"] = bool(result.get("crime_detected", False))
+        result["threat_score"] = threat_score
+        result["confidence"] = normalize_confidence(confidence)
+
+        # 🔍 DEBUG: Log final decision inputs
+        try:
+            print("PERSONS:", result.get("persons_detected"))
+            print("ACTIVITIES:", result.get("activities", []))
+            print("THREAT SCORE:", result.get("threat_score"))
+        except Exception:
+            pass
+        
+        return result
+        
     except Exception as e:
         print(f"Error in analyze_image: {e}")
         return {
             "type": "ANALYSIS_ERROR",
             "confidence": 0.0,
-            "crime_detected": 0,
+            "crime_detected": False,
             "threat_level": "LOW",
             "persons_detected": 0,
             "activities": [],

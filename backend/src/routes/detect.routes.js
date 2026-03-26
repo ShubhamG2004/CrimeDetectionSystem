@@ -79,11 +79,13 @@ const evaluateThreatContext = ({
   activities = [],
   confidence = 0,
   locationName = "",
+  persons = 0,
 }) => {
   const sanitizedSignals = sanitizeSignals(signals);
   const normalizedActivities = Array.isArray(activities)
     ? activities.filter(Boolean)
     : [];
+  const normalizedPersons = Number(persons) || 0;
 
   const reasons = [];
 
@@ -93,6 +95,19 @@ const evaluateThreatContext = ({
     normalizedActivities,
     THREAT_KEYWORDS.suspiciousActivities
   );
+
+  const requiresMultiplePersons = hasWeapon || normalizedActivities.includes("STABBING_ATTACK");
+  const insufficientPersons = requiresMultiplePersons && normalizedPersons < 2;
+  if (insufficientPersons) {
+    reasons.push("single-person-context");
+  }
+
+  const stabbingWithoutAssault =
+    normalizedActivities.includes("STABBING_ATTACK") &&
+    !normalizedActivities.includes("PHYSICAL_ASSAULT");
+  if (stabbingWithoutAssault) {
+    reasons.push("stabbing-without-physical-assault");
+  }
 
   if (!hasWeapon) {
     reasons.push("no-weapon-detected");
@@ -118,14 +133,39 @@ const evaluateThreatContext = ({
 
   const isRealThreat =
     hasWeapon &&
-    (hasViolentContext || hasSuspiciousContext) &&
+    (hasViolentContext || hasSuspiciousContext || normalizedActivities.includes("PHYSICAL_ASSAULT")) &&
     !lowConfidence &&
-    !filteredLocation;
+    !filteredLocation &&
+    !insufficientPersons &&
+    !stabbingWithoutAssault;
 
   return {
     isRealThreat,
     sanitizedSignals,
+    normalizedActivities,
     reasons: isRealThreat ? [] : reasons,
+  };
+};
+
+const stripSinglePersonMarkers = ({ signals = [], activities = [], persons = 0 }) => {
+  const normalizedPersons = Number(persons) || 0;
+  if (normalizedPersons >= 2) {
+    return { signals, activities };
+  }
+
+  const filteredSignals = signals.filter((signal) => {
+    const upper = toUpperSafe(signal);
+    return !upper.includes("SEXUAL") && !upper.includes("LOWER_BODY");
+  });
+
+  const filteredActivities = activities.filter((activity) => {
+    const upper = toUpperSafe(activity);
+    return !upper.includes("SEXUAL");
+  });
+
+  return {
+    signals: filteredSignals,
+    activities: filteredActivities,
   };
 };
 
@@ -237,6 +277,7 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
       persons_detected = 0,
       activities = [],
       signals = [],
+      crime_detected: aiCrimeDetected = false,
       timestamp = null,
     } = aiRes.data || {};
 
@@ -247,16 +288,33 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
       persons_detected,
     });
 
+    const personsCount = Number(persons_detected) || 0;
     const {
       isRealThreat,
       sanitizedSignals,
+      normalizedActivities,
       reasons: suppressionReasons,
     } = evaluateThreatContext({
       signals,
       activities,
       confidence,
       locationName: location.name,
+      persons: personsCount,
     });
+
+    let finalSignals = sanitizedSignals;
+    let finalActivities = normalizedActivities;
+
+    const singlePersonStripped = stripSinglePersonMarkers({
+      signals: finalSignals,
+      activities: finalActivities,
+      persons: personsCount,
+    });
+
+    finalSignals = singlePersonStripped.signals;
+    finalActivities = singlePersonStripped.activities;
+
+    const finalCrimeDetected = Boolean(aiCrimeDetected) && isRealThreat;
 
     if (!isRealThreat) {
       console.log("⚠️ Context filter suppressed alert", {
@@ -289,9 +347,10 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
 
       cameraId: requestedCameraId,
 
-      persons_detected: Number(persons_detected) || 0,
-      activities,
-      signals: sanitizedSignals,
+      persons_detected: personsCount,
+      activities: finalActivities,
+      signals: finalSignals,
+      crime_detected: finalCrimeDetected,
 
       location, // ✅ ALWAYS CONSISTENT
 

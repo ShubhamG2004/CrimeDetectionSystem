@@ -135,24 +135,9 @@ export default function ImageDetectionPage() {
   };
 
   /* ================= DETERMINE CRIME STATUS ================= */
+  /* 🔥 FIXED: Trust backend crime_detected field completely */
   const determineCrimeStatus = (data) => {
-    // If crime_detected is explicitly set, use it
-    if (data.crime_detected !== undefined) {
-      return data.crime_detected;
-    }
-    
-    // Otherwise infer from threat level and crime type
-    const threatLevel = data.threat_level?.toUpperCase() || "LOW";
-    const crimeType = data.crime_type || data.type || "";
-    const confidence = data.confidence || 0;
-    
-    // If it's a serious crime type or high threat level, mark as crime detected
-    const seriousCrimes = ["KIDNAPPING", "ABDUCTION", "ASSAULT", "ROBBERY", "FIGHT"];
-    const isSeriousCrime = seriousCrimes.some(crime => 
-      crimeType.toUpperCase().includes(crime)
-    );
-    
-    return isSeriousCrime || threatLevel === "HIGH" || threatLevel === "CRITICAL" || confidence > 0.7;
+    return Boolean(data.crime_detected);
   };
 
   /* ================= SUBMIT ================= */
@@ -212,7 +197,8 @@ export default function ImageDetectionPage() {
         confidence: Number(data.data.confidence) || 0,
         persons_detected: Number(data.data.persons_detected) || 0,
         threat_score: calculateThreatScore(data.data),
-        crime_detected: determineCrimeStatus(data.data),
+        // 🔥 TRUST BACKEND COMPLETELY FOR CRIME STATUS
+        crime_detected: Boolean(data.data.crime_detected),
       };
 
       setResult(processedData);

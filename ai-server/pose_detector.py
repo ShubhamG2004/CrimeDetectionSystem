@@ -38,13 +38,29 @@ class PoseCrimeDetector:
     def analyze(self, image):
         # Process with higher resolution for better keypoint accuracy
         results = self.model(image, conf=0.3, iou=0.45, verbose=False)[0]  # Lowered confidence threshold
-        
-        if results.keypoints is None or len(results.keypoints) == 0:
+
+        # ---------------- ROBUST PERSON COUNTING ----------------
+        # Base person count primarily on raw detections, with a safe fallback
+        raw_persons_kps = 0
+        raw_persons_boxes = 0
+
+        if results.keypoints is not None and getattr(results.keypoints, "xy", None) is not None:
+            raw_kps_all = results.keypoints.xy.cpu().numpy()
+            raw_persons_kps = len(raw_kps_all)
+        else:
+            raw_kps_all = None
+
+        if results.boxes is not None:
+            raw_persons_boxes = len(results.boxes)
+
+        # If no keypoints at all, we can't do pose analysis – treat as empty
+        if raw_kps_all is None or raw_persons_kps == 0:
             return self._empty_result()
-        
-        kps_all = results.keypoints.xy.cpu().numpy()
+
+        # Use keypoints for detailed analysis
+        kps_all = raw_kps_all
         conf_all = results.keypoints.conf.cpu().numpy() if results.keypoints.conf is not None else None
-        boxes = results.boxes.xyxy.cpu().numpy()
+        boxes = results.boxes.xyxy.cpu().numpy() if results.boxes is not None else None
         
         # Filter out low-quality detections EARLY
         valid_detections = []
@@ -60,15 +76,19 @@ class PoseCrimeDetector:
                     valid_detections.append(idx)
         
         if len(valid_detections) == 0:
-            return self._empty_result()
-        
-        # Use only valid detections
-        kps_all = kps_all[valid_detections]
-        if conf_all is not None:
-            conf_all = conf_all[valid_detections]
-        boxes = boxes[valid_detections]
-        
-        persons = len(kps_all)
+            # Even if all poses are low quality, keep person count from raw detections
+            persons_valid = 0
+        else:
+            # Use only valid detections
+            kps_all = kps_all[valid_detections]
+            if conf_all is not None:
+                conf_all = conf_all[valid_detections]
+            if boxes is not None:
+                boxes = boxes[valid_detections]
+            persons_valid = len(kps_all)
+
+        # FINAL PERSON COUNT (robust): use max of valid poses, raw poses, and raw boxes
+        persons = max(persons_valid, raw_persons_kps, raw_persons_boxes)
         threat_score = 0
         signals = []
         activities = []
@@ -83,7 +103,8 @@ class PoseCrimeDetector:
             activities.extend(person_acts)
         
         # ---- MULTI-PERSON ANALYSIS ----
-        if persons >= 2:
+        # Use only validated pose detections for interaction analysis
+        if persons_valid >= 2:
             inter_signals, inter_acts = self._analyze_interactions(kps_all, boxes, person_signals, conf_all)
             signals.extend(inter_signals)
             activities.extend(inter_acts)
