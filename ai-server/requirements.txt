@@ -3,3 +3,4 @@ opencv-python
 requests
 flask
 flask-cors
+deep-sort-realtime

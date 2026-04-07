@@ -50,6 +50,7 @@ exports.createIncident = async (req, res) => {
     let location = {
       name: "Unknown Camera",
       area: "Unknown Area",
+      cameraId,
       lat: null,
       lng: null,
     };
@@ -67,6 +68,7 @@ exports.createIncident = async (req, res) => {
       location = {
         name: cameraData.name || "Camera",
         area: cameraData.area || "Unknown Area",
+        cameraId,
         lat:
           typeof cameraData.latitude === "number"
             ? cameraData.latitude

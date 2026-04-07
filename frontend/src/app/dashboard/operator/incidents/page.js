@@ -1,38 +1,103 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,
   onSnapshot,
   doc,
   updateDoc,
   query,
-  orderBy
+  orderBy,
+  where,
+  getDoc
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { auth, db } from "@/lib/firebase";
 
 import Navbar from "@/components/Navbar";
 import OperatorSidebar from "@/components/OperatorSidebar";
 
 export default function OperatorIncidentsPage() {
+  const router = useRouter();
   const [incidents, setIncidents] = useState([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [operatorCameras, setOperatorCameras] = useState(null);
 
   useEffect(() => {
-    const q = query(
-      collection(db, "incidents"),
-      orderBy("createdAt", "desc")
-    );
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.replace("/login");
+        return;
+      }
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data()
-      }));
-      setIncidents(list);
+      const role = localStorage.getItem("role");
+      if (role !== "operator") {
+        router.replace("/dashboard");
+        return;
+      }
+
+      try {
+        const opSnap = await getDoc(doc(db, "operators", user.uid));
+        if (!opSnap.exists()) {
+          setError("Operator profile not found.");
+          setLoading(false);
+          return;
+        }
+
+        setOperatorCameras(opSnap.data().cameras || []);
+      } catch (authErr) {
+        console.error("Failed to load operator profile:", authErr);
+        setError("Unable to load operator profile.");
+        setLoading(false);
+      }
     });
 
+    return () => unsubscribeAuth();
+  }, [router]);
+
+  useEffect(() => {
+    if (!operatorCameras) {
+      return;
+    }
+
+    if (operatorCameras.length === 0) {
+      setIncidents([]);
+      setLoading(false);
+      return;
+    }
+
+    const q = query(
+      collection(db, "incidents"),
+      orderBy("createdAt", "desc"),
+      where("cameraId", "in", operatorCameras)
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        const list = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setIncidents(list);
+        setError("");
+        setLoading(false);
+      },
+      (snapshotError) => {
+        console.error("Failed to subscribe to incidents:", snapshotError);
+        setError(
+          snapshotError?.code === "permission-denied"
+            ? "You do not have permission to read incidents for the assigned cameras."
+            : "Unable to load incidents right now."
+        );
+        setLoading(false);
+      }
+    );
+
     return () => unsubscribe();
-  }, []);
+  }, [operatorCameras]);
 
   const handleAck = async (id) => {
     await updateDoc(doc(db, "incidents", id), {
@@ -60,8 +125,20 @@ export default function OperatorIncidentsPage() {
             Active Incidents
           </h2>
 
+          {error && (
+            <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+              {error}
+            </div>
+          )}
+
           <div className="space-y-4">
-            {incidents.map((incident) => (
+            {loading && (
+              <div className="text-center text-slate-500 py-10">
+                Loading incidents...
+              </div>
+            )}
+
+            {!loading && incidents.map((incident) => (
               <div
                 key={incident.id}
                 className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm"
@@ -109,7 +186,7 @@ export default function OperatorIncidentsPage() {
               </div>
             ))}
 
-            {incidents.length === 0 && (
+            {!loading && incidents.length === 0 && (
               <div className="text-center text-slate-500 py-10">
                 No incidents found.
               </div>

@@ -97,7 +97,7 @@ useEffect(() => {
       const q = query(
         collection(db, "incidents"),
         orderBy("createdAt", "desc"),
-        where("location.cameraId", "in", operatorCameras)
+        where("cameraId", "in", operatorCameras)
       );
 
       const snap = await getDocs(q);

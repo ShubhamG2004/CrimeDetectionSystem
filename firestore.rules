@@ -36,13 +36,20 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/operators/$(request.auth.uid));
     }
 
+    function incidentCameraId() {
+      return resource.data.cameraId != null
+        ? resource.data.cameraId
+        : resource.data.location != null && resource.data.location.cameraId != null
+          ? resource.data.location.cameraId
+          : null;
+    }
+
     function canReadIncidentForAssignedCamera() {
       return isOperator() &&
         operatorDoc().exists() &&
         operatorDoc().data.cameras != null &&
-        resource.data.location != null &&
-        resource.data.location.cameraId != null &&
-        resource.data.location.cameraId in operatorDoc().data.cameras;
+        incidentCameraId() != null &&
+        incidentCameraId() in operatorDoc().data.cameras;
     }
 
     function isValidCameraStatus(status) {
