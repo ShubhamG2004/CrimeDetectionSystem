@@ -107,7 +107,22 @@ router.get("/cameras", verifyToken, async (req, res) => {
     return res.json(cameras);
   } catch (err) {
     console.error("❌ OPERATOR CAMERAS ERROR:", err);
-    return res.json([]);
+    const errorText = String(err?.message || "").toLowerCase();
+    const isQuotaError = err?.code === 8 || errorText.includes("resource_exhausted") || errorText.includes("quota");
+
+    if (isQuotaError) {
+      return res.status(503).json({
+        success: false,
+        cameras: [],
+        message: "Incident service is temporarily unavailable (Firestore quota exceeded)",
+      });
+    }
+
+    return res.status(500).json({
+      success: false,
+      cameras: [],
+      message: "Failed to fetch assigned cameras",
+    });
   }
 });
 
@@ -120,6 +135,14 @@ router.get("/cameras", verifyToken, async (req, res) => {
 router.get("/incidents", verifyToken, async (req, res) => {
   try {
     const uid = req.user?.uid;
+    if (!uid) {
+      return res.status(401).json({
+        success: false,
+        incidents: [],
+        total: 0,
+        message: "Unauthorized request",
+      });
+    }
 
     const operatorSnap = await admin
       .firestore()
@@ -153,17 +176,27 @@ router.get("/incidents", verifyToken, async (req, res) => {
       chunks.push(cameraIds.slice(index, index + 10));
     }
 
-    const [topLevelSnapshots, nestedSnapshots] = await Promise.all([
-      Promise.all(
-        chunks.map((chunk) =>
-          admin
+    const topLevelSnapshots = await Promise.all(
+      chunks.map(async (chunk) => {
+        try {
+          return await admin
             .firestore()
             .collection("incidents")
             .where("cameraId", "in", chunk)
-            .get()
-        )
-      ),
-      Promise.all(
+            .get();
+        } catch (topLevelQueryError) {
+          console.warn(
+            "⚠️ Top-level incident cameraId query failed for a chunk; continuing with remaining chunks:",
+            topLevelQueryError.message
+          );
+          return { docs: [] };
+        }
+      })
+    );
+
+    let nestedSnapshots = [];
+    try {
+      nestedSnapshots = await Promise.all(
         chunks.map((chunk) =>
           admin
             .firestore()
@@ -171,8 +204,13 @@ router.get("/incidents", verifyToken, async (req, res) => {
             .where("location.cameraId", "in", chunk)
             .get()
         )
-      ),
-    ]);
+      );
+    } catch (nestedQueryError) {
+      console.warn(
+        "⚠️ Nested incident cameraId query failed; continuing with top-level cameraId results:",
+        nestedQueryError.message
+      );
+    }
 
     const incidents = dedupeIncidents([
       ...topLevelSnapshots.flatMap((snapshot) => snapshot.docs.map(serializeIncident)),
@@ -191,8 +229,22 @@ router.get("/incidents", verifyToken, async (req, res) => {
     });
   } catch (err) {
     console.error("❌ OPERATOR INCIDENTS ERROR:", err);
+    const errorText = String(err?.message || "").toLowerCase();
+    const isQuotaError = err?.code === 8 || errorText.includes("resource_exhausted") || errorText.includes("quota");
+
+    if (isQuotaError) {
+      return res.status(503).json({
+        success: false,
+        incidents: [],
+        total: 0,
+        message: "Incident service is temporarily unavailable (Firestore quota exceeded)",
+      });
+    }
+
     return res.status(500).json({
       success: false,
+      incidents: [],
+      total: 0,
       message: "Failed to fetch incidents",
     });
   }

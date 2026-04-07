@@ -3,11 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-"use client";
 import { auth } from "@/lib/firebase";
 import { ROLES } from "@/lib/roles";
 import {
-import Link from "next/link";
   Camera,
   ChevronRight,
   Clock3,
@@ -392,31 +390,6 @@ export default function OperatorCamerasPage() {
                         <p className="mt-1 text-sm font-semibold">{selectedCamera?.status || "active"}</p>
                       </div>
                     </div>
-                    <div className="flex items-start justify-between gap-4">
-                        <div>
-                          <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Live Monitoring</p>
-                          <h3 className="mt-1 text-2xl font-semibold">
-                            {selectedCamera ? getCameraName(selectedCamera) : "Select a camera"}
-                          </h3>
-                          <p className="mt-1 text-sm text-slate-300">
-                            {selectedCamera ? getCameraLocation(selectedCamera) : "Choose an assigned camera to begin monitoring"}
-                          </p>
-                        </div>
-                        <div className="flex flex-col gap-2 items-end">
-                          <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-right">
-                            <p className="text-[10px] uppercase tracking-wide text-slate-200">Monitoring</p>
-                            <p className="mt-1 text-sm font-semibold">{selectedCamera?.status || "active"}</p>
-                          </div>
-                          {selectedCamera && (
-                            <Link
-                              href={`/dashboard/operator/cameras/${selectedCamera.cameraId}`}
-                              className="px-3 py-2 bg-white/20 hover:bg-white/30 text-white text-xs font-semibold rounded-lg transition"
-                            >
-                              Fullscreen
-                            </Link>
-                          )}
-                        </div>
-                      </div>
                   </div>
 
                   <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr]">

@@ -25,6 +25,8 @@ import {
 import Navbar from "@/components/Navbar";
 import OperatorSidebar from "@/components/OperatorSidebar";
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+
 export default function OperatorDashboard() {
   const router = useRouter();
 
@@ -45,6 +47,10 @@ export default function OperatorDashboard() {
   });
   const [mounted, setMounted] = useState(false);
 
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   /* ---------- AUTH GUARD ---------- */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
@@ -60,33 +66,71 @@ export default function OperatorDashboard() {
 
       try {
         const token = await user.getIdToken(true);
-        const response = await fetch("http://localhost:5000/api/operator/incidents", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        const [incidentResponse, cameraResponse] = await Promise.all([
+          fetch(`${API_URL}/api/operator/incidents`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+          fetch(`${API_URL}/api/operator/cameras`, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }),
+        ]);
 
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data?.message || `HTTP_${response.status}`);
+        let incidentData = null;
+        try {
+          incidentData = await incidentResponse.json();
+        } catch (_parseError) {
+          incidentData = null;
         }
 
-        const normalizedIncidents = Array.isArray(data.incidents)
-          ? data.incidents.map((incident) => ({
+        let cameraData = null;
+        try {
+          cameraData = await cameraResponse.json();
+        } catch (_parseError) {
+          cameraData = null;
+        }
+
+        if (!incidentResponse.ok || incidentData?.success === false) {
+          const backendMessage = incidentData?.message || `HTTP_${incidentResponse.status}`;
+          const normalizedBackendMessage = String(backendMessage).toLowerCase();
+          const isServiceUnavailableMessage =
+            normalizedBackendMessage.includes("quota") ||
+            normalizedBackendMessage.includes("resource_exhausted") ||
+            normalizedBackendMessage.includes("temporarily unavailable") ||
+            normalizedBackendMessage.includes("failed to fetch incidents");
+
+          setLoading(false);
+          setIncidents([]);
+          setOperatorCameras([]);
+          setError(
+            normalizedBackendMessage.includes("operator") || isServiceUnavailableMessage
+              ? backendMessage
+              : "Unable to load incidents right now."
+          );
+          return;
+        }
+
+        const normalizedIncidents = Array.isArray(incidentData?.incidents)
+          ? incidentData.incidents.map((incident) => ({
               ...incident,
               createdAt: incident.createdAt ? new Date(incident.createdAt) : null,
             }))
           : [];
 
-        setOperatorCameras(
-          [...new Set(normalizedIncidents.map((incident) => incident.cameraId).filter(Boolean))]
-        );
+        const normalizedCameras = Array.isArray(cameraData)
+          ? cameraData
+              .map((camera) => camera?.cameraId || camera?.id)
+              .filter(Boolean)
+          : [];
+
+        setOperatorCameras([...new Set(normalizedCameras)]);
         setIncidents(normalizedIncidents);
         calculateStats(normalizedIncidents);
         setLoading(false);
       } catch (err) {
-        console.error("Failed to load operator incidents:", err);
         const code = err?.code || "";
         const message = String(err?.message || "").toLowerCase();
         const isPermissionDenied =
@@ -135,6 +179,7 @@ export default function OperatorDashboard() {
   const filteredIncidents = incidents.filter((i) => {
       const cameraMatch =
         cameraFilter === "all" ||
+        i.cameraId === cameraFilter ||
         i.location?.cameraId === cameraFilter;
 
       const severityMatch =
@@ -506,8 +551,20 @@ export default function OperatorDashboard() {
                 <div className="inline-block p-4 bg-gray-50 rounded-2xl mb-4">
                   <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto" />
                 </div>
-                <h3 className="text-lg font-medium text-gray-700 mb-2">No incidents found</h3>
-                <p className="text-gray-500">Try adjusting your filters or search criteria</p>
+                <h3 className="text-lg font-medium text-gray-700 mb-2">
+                  {operatorCameras && operatorCameras.length === 0
+                    ? "No cameras assigned"
+                    : incidents.length === 0
+                    ? "No incidents yet"
+                    : "No incidents found"}
+                </h3>
+                <p className="text-gray-500">
+                  {operatorCameras && operatorCameras.length === 0
+                    ? "Ask your admin to assign one or more cameras to your account."
+                    : incidents.length === 0
+                    ? "No incidents were detected for your assigned cameras yet."
+                    : "Try adjusting your filters or search criteria."}
+                </p>
               </div>
             ) : (
               <div className="divide-y divide-gray-100">

@@ -15,7 +15,7 @@ const jetbrainsMono = JetBrains_Mono({
 
 export const metadata = {
   title: "Crime Detection System",
-  description: "Real-time monitoring and AI-assisted incident detection",
+  description: "A clean, modern dashboard for AI-assisted incident detection and response.",
 };
 
 export default function RootLayout({ children }) {
