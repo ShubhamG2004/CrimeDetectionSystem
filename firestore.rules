@@ -9,12 +9,22 @@ service cloud.firestore {
       return isSignedIn() && request.auth.token.role == role;
     }
 
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdminAccount() {
+      return isSignedIn() &&
+        userDoc().exists() &&
+        userDoc().data.role == 'admin';
+    }
+
     function isAdmin() {
-      return hasRole('admin');
+      return hasRole('admin') || isAdminAccount();
     }
 
     function isFieldOperator() {
-      return hasRole('field_operator');
+      return hasRole('field_operator') || isFieldOperatorAccount();
     }
 
     function fieldOperatorDoc() {
@@ -29,11 +39,18 @@ service cloud.firestore {
     }
 
     function isOperator() {
-      return hasRole('operator');
+      return hasRole('operator') || isOperatorAccount();
     }
 
     function operatorDoc() {
       return get(/databases/$(database)/documents/operators/$(request.auth.uid));
+    }
+
+    function isOperatorAccount() {
+      return isSignedIn() &&
+        operatorDoc().exists() &&
+        (operatorDoc().data.role == 'operator' || operatorDoc().data.role == null) &&
+        (operatorDoc().data.status == 'active' || operatorDoc().data.status == null);
     }
 
     function incidentCameraId() {

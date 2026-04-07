@@ -5,6 +5,32 @@ const COLLECTION = "alerts";
 
 const normalizeStatus = (status) => String(status || "").toLowerCase();
 
+// 🔧 Convert Firestore Timestamps to ISO strings for JSON serialization
+const serializeAlert = (alertDoc) => {
+  const data = { id: alertDoc.id, ...alertDoc.data() };
+
+  // Convert Firestore Timestamp fields to ISO strings
+  if (data.createdAt?.toDate) {
+    data.createdAt = data.createdAt.toDate().toISOString();
+  } else if (data.createdAt instanceof Date) {
+    data.createdAt = data.createdAt.toISOString();
+  }
+
+  if (data.updatedAt?.toDate) {
+    data.updatedAt = data.updatedAt.toDate().toISOString();
+  } else if (data.updatedAt instanceof Date) {
+    data.updatedAt = data.updatedAt.toISOString();
+  }
+
+  if (data.triggeredAt?.toDate) {
+    data.triggeredAt = data.triggeredAt.toDate().toISOString();
+  } else if (data.triggeredAt instanceof Date) {
+    data.triggeredAt = data.triggeredAt.toISOString();
+  }
+
+  return data;
+};
+
 exports.listAlerts = async (req, res) => {
   try {
     const { status, stationId, limit } = req.query;
@@ -19,7 +45,7 @@ exports.listAlerts = async (req, res) => {
     }
 
     const docs = await query.limit(Number(limit || 100)).get();
-    const data = docs.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const data = docs.docs.map(serializeAlert);
 
     res.status(200).json({ success: true, data });
   } catch (err) {
@@ -34,7 +60,7 @@ exports.getAlert = async (req, res) => {
     if (!doc.exists) {
       return res.status(404).json({ success: false, message: "Alert not found" });
     }
-    res.status(200).json({ success: true, data: { id: doc.id, ...doc.data() } });
+    res.status(200).json({ success: true, data: serializeAlert(doc) });
   } catch (err) {
     console.error("getAlert error:", err.message);
     res.status(500).json({ success: false, message: "Failed to load alert" });
@@ -83,7 +109,7 @@ exports.updateAlertStatus = async (req, res) => {
 
     res.status(200).json({
       success: true,
-      data: { id: updatedDoc.id, ...updatedDoc.data() },
+      data: serializeAlert(updatedDoc),
     });
   } catch (err) {
     console.error("updateAlertStatus error:", err.message);
@@ -114,7 +140,8 @@ exports.acknowledgeAlert = async (req, res) => {
       statusHistory: admin.firestore.FieldValue.arrayUnion(historyEntry),
     });
 
-    res.status(200).json({ success: true, message: "Alert acknowledged" });
+    const updatedDoc = await alertRef.get();
+    res.status(200).json({ success: true, data: serializeAlert(updatedDoc) });
   } catch (err) {
     console.error("acknowledgeAlert error:", err.message);
     res.status(500).json({ success: false, message: "Failed to acknowledge alert" });

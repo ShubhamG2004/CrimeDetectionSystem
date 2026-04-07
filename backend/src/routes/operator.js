@@ -3,6 +3,47 @@ const router = express.Router();
 const { admin } = require("../config/firebase");
 const { verifyToken } = require("../middleware/auth");
 
+const serializeTimestamp = (value) => {
+  if (!value) return null;
+
+  if (typeof value.toDate === "function") {
+    return value.toDate().toISOString();
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString();
+  }
+
+  return value;
+};
+
+const serializeIncident = (doc) => {
+  const data = doc.data() || {};
+
+  return {
+    id: doc.id,
+    ...data,
+    createdAt: serializeTimestamp(data.createdAt),
+    updatedAt: serializeTimestamp(data.updatedAt),
+  };
+};
+
+const dedupeIncidents = (incidents) => {
+  const seen = new Set();
+  const unique = [];
+
+  incidents.forEach((incident) => {
+    if (seen.has(incident.id)) {
+      return;
+    }
+
+    seen.add(incident.id);
+    unique.push(incident);
+  });
+
+  return unique;
+};
+
 /**
  * ======================================================
  * 🎥 Get cameras assigned to logged-in operator
@@ -67,6 +108,93 @@ router.get("/cameras", verifyToken, async (req, res) => {
   } catch (err) {
     console.error("❌ OPERATOR CAMERAS ERROR:", err);
     return res.json([]);
+  }
+});
+
+/**
+ * ======================================================
+ * 🚨 Get incidents assigned to logged-in operator
+ * Source: admin Firestore query scoped by camera IDs
+ * ======================================================
+ */
+router.get("/incidents", verifyToken, async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+
+    const operatorSnap = await admin
+      .firestore()
+      .collection("operators")
+      .doc(uid)
+      .get();
+
+    if (!operatorSnap.exists) {
+      return res.status(403).json({
+        success: false,
+        message: "Operator profile not found",
+      });
+    }
+
+    const operator = operatorSnap.data() || {};
+    if (operator.status !== "active") {
+      return res.status(403).json({
+        success: false,
+        message: "Operator account is inactive",
+      });
+    }
+
+    const cameraIds = Array.isArray(operator.cameras) ? operator.cameras.filter(Boolean) : [];
+
+    if (!cameraIds.length) {
+      return res.status(200).json({ success: true, incidents: [] });
+    }
+
+    const chunks = [];
+    for (let index = 0; index < cameraIds.length; index += 10) {
+      chunks.push(cameraIds.slice(index, index + 10));
+    }
+
+    const [topLevelSnapshots, nestedSnapshots] = await Promise.all([
+      Promise.all(
+        chunks.map((chunk) =>
+          admin
+            .firestore()
+            .collection("incidents")
+            .where("cameraId", "in", chunk)
+            .get()
+        )
+      ),
+      Promise.all(
+        chunks.map((chunk) =>
+          admin
+            .firestore()
+            .collection("incidents")
+            .where("location.cameraId", "in", chunk)
+            .get()
+        )
+      ),
+    ]);
+
+    const incidents = dedupeIncidents([
+      ...topLevelSnapshots.flatMap((snapshot) => snapshot.docs.map(serializeIncident)),
+      ...nestedSnapshots.flatMap((snapshot) => snapshot.docs.map(serializeIncident)),
+    ])
+      .sort((a, b) => {
+        const aMs = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const bMs = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return bMs - aMs;
+      });
+
+    return res.status(200).json({
+      success: true,
+      incidents,
+      total: incidents.length,
+    });
+  } catch (err) {
+    console.error("❌ OPERATOR INCIDENTS ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch incidents",
+    });
   }
 });
 

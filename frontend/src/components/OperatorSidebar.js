@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
-import { AlertTriangle, Image, Map, Shield, CheckCircle, UserCircle2 } from "lucide-react";
+import { AlertTriangle, Image, Map, Shield, CheckCircle, UserCircle2, Camera } from "lucide-react";
 import LogoutButton from "./LogoutButton";
 
 export default function OperatorSidebar() {
@@ -99,6 +99,15 @@ export default function OperatorSidebar() {
           >
             <CheckCircle className={iconClass(isActive("/dashboard/operator/incidents"))} />
             <span className={labelClass(isActive("/dashboard/operator/incidents"))}>Manage Incidents</span>
+          </Link>
+
+          <Link
+            href="/dashboard/operator/cameras"
+            onClick={handleClose}
+            className={navItemClass(isActive("/dashboard/operator/cameras"))}
+          >
+            <Camera className={iconClass(isActive("/dashboard/operator/cameras"))} />
+            <span className={labelClass(isActive("/dashboard/operator/cameras"))}>My Cameras</span>
           </Link>
 
           <Link

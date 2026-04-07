@@ -1,16 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import {
-  collection,
-  query,
-  where,
-  onSnapshot,
-  getDoc,
-  doc,
-} from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 
 import IncidentMap from "@/components/IncidentMap";
 import Navbar from "@/components/Navbar";
@@ -82,8 +74,6 @@ export default function OperatorMapPage() {
   }, []);
 
   useEffect(() => {
-    let unsubscribeIncidents = null;
-
     const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         setError("Authentication required. Please log in to access the incident map.");
@@ -95,62 +85,53 @@ export default function OperatorMapPage() {
         setLoading(true);
         setError(null);
 
-        // 🔐 Ensure fresh token for Firestore rules
-        await user.getIdToken(true);
-
-        /* 1️⃣ Load operator profile */
-        const operatorSnap = await getDoc(
-          doc(db, "operators", user.uid)
-        );
-
-        if (!operatorSnap.exists()) {
-          setError("Operator profile not found. Please contact support.");
-          setLoading(false);
-          return;
-        }
-
-        const cameraIds = operatorSnap.data().cameras || [];
-        setCameraCount(cameraIds.length);
-
-        if (cameraIds.length === 0) {
-          setError("No cameras assigned to your account. Please contact your administrator.");
-          setLoading(false);
-          return;
-        }
-
-        /* 2️⃣ Real-time incidents (Firestore-safe) */
-        const q = query(
-          collection(db, "incidents"),
-          where("location.cameraId", "in", cameraIds)
-        );
-
-        unsubscribeIncidents = onSnapshot(
-          q,
-          (snapshot) => {
-            const list = snapshot.docs.map((d) => ({
-              id: d.id,
-              ...d.data(),
-            }));
-            setIncidents(list);
-            setLastUpdate(new Date());
-            setLoading(false);
+        const token = await user.getIdToken(true);
+        const response = await fetch("http://localhost:5000/api/operator/incidents", {
+          headers: {
+            Authorization: `Bearer ${token}`,
           },
-          (err) => {
-            console.error("❌ Firestore snapshot error:", err);
-            setError("Connection error. Please check your internet connection.");
-            setLoading(false);
-          }
-        );
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.message || `HTTP_${response.status}`);
+        }
+
+        const list = Array.isArray(data.incidents)
+          ? data.incidents.map((incident) => ({
+              ...incident,
+              createdAt: incident.createdAt ? new Date(incident.createdAt) : null,
+              updatedAt: incident.updatedAt ? new Date(incident.updatedAt) : null,
+            }))
+          : [];
+
+        const cameraIds = [...new Set(list.map((incident) => incident.cameraId).filter(Boolean))];
+        setCameraCount(cameraIds.length);
+        setIncidents(list);
+        setLastUpdate(new Date());
+        setLoading(false);
       } catch (err) {
         console.error("❌ Operator map error:", err);
-        setError("Unable to load incident data. Please try again.");
+        const code = err?.code || "";
+        const message = String(err?.message || "").toLowerCase();
+        const isPermissionDenied =
+          code.includes("permission-denied") ||
+          message.includes("missing or insufficient permissions") ||
+          message.includes("operator profile not found") ||
+          message.includes("operator account is inactive");
+
+        setError(
+          isPermissionDenied
+            ? "You do not have permission to read incidents for the assigned cameras."
+            : "Unable to load incident data. Please try again."
+        );
         setLoading(false);
       }
     });
 
     return () => {
       unsubscribeAuth();
-      if (unsubscribeIncidents) unsubscribeIncidents();
     };
   }, []);
 

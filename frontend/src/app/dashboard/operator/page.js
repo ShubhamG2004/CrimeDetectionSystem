@@ -3,17 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
+import { auth } from "@/lib/firebase";
 import { ROLES } from "@/lib/roles";
-import {
-  collection,
-  doc,
-  getDocs,
-  getDoc,
-  orderBy,
-  query,
-  where
-} from "firebase/firestore";
 import {
   BarChart3,
   AlertTriangle,
@@ -42,6 +33,7 @@ export default function OperatorDashboard() {
   const [severityFilter, setSeverityFilter] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [selectedIncident, setSelectedIncident] = useState(null);
   const [operatorCameras, setOperatorCameras] = useState(null);
   const [stats, setStats] = useState({
@@ -66,62 +58,55 @@ export default function OperatorDashboard() {
         return;
       }
 
-      const opRef = doc(db, "operators", user.uid);
-      const opSnap = await getDoc(opRef);
+      try {
+        const token = await user.getIdToken(true);
+        const response = await fetch("http://localhost:5000/api/operator/incidents", {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-      if (!opSnap.exists()) {
-        console.error("Operator profile missing");
-        return;
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.message || `HTTP_${response.status}`);
+        }
+
+        const normalizedIncidents = Array.isArray(data.incidents)
+          ? data.incidents.map((incident) => ({
+              ...incident,
+              createdAt: incident.createdAt ? new Date(incident.createdAt) : null,
+            }))
+          : [];
+
+        setOperatorCameras(
+          [...new Set(normalizedIncidents.map((incident) => incident.cameraId).filter(Boolean))]
+        );
+        setIncidents(normalizedIncidents);
+        calculateStats(normalizedIncidents);
+        setLoading(false);
+      } catch (err) {
+        console.error("Failed to load operator incidents:", err);
+        const code = err?.code || "";
+        const message = String(err?.message || "").toLowerCase();
+        const isPermissionDenied =
+          code.includes("permission-denied") ||
+          message.includes("missing or insufficient permissions") ||
+          message.includes("only operators can view incident feeds");
+
+        setLoading(false);
+        setIncidents([]);
+        setOperatorCameras([]);
+        setError(
+          isPermissionDenied
+            ? "You do not have permission to read this operator feed."
+            : "Unable to load incidents right now."
+        );
       }
-
-      setOperatorCameras(opSnap.data().cameras || []);
     });
 
     return () => unsub();
   }, [router]);
-
-  /* ---------- FETCH INCIDENTS ---------- */
-  /* ---------- FETCH INCIDENTS (FIXED & SECURE) ---------- */
-useEffect(() => {
-  if (!operatorCameras || operatorCameras.length === 0) return;
-
-  const fetchIncidents = async () => {
-    try {
-      setLoading(true);
-
-      /**
-       * Firestore limitation:
-       * "in" query supports max 10 values.
-       * If you ever assign >10 cameras, we’ll chunk later.
-       */
-      const q = query(
-        collection(db, "incidents"),
-        orderBy("createdAt", "desc"),
-        where("cameraId", "in", operatorCameras)
-      );
-
-      const snap = await getDocs(q);
-
-      const list = snap.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          ...data,
-          createdAt: data.createdAt?.toDate() || null,
-        };
-      });
-
-      setIncidents(list);
-      calculateStats(list);
-    } catch (err) {
-      console.error("❌ Fetch incidents error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchIncidents();
-}, [operatorCameras]);
 
 
 
@@ -244,7 +229,7 @@ useEffect(() => {
 
   const getUniqueCameras = () => {
     const cameras = incidents
-      .map(i => i.location?.cameraId)
+      .map(i => i.cameraId || i.location?.cameraId)
       .filter(Boolean);
     return [...new Set(cameras)];
   };
@@ -255,7 +240,7 @@ useEffect(() => {
       Type: inc.crime_type,
       Severity: inc.threat_level,
       Location: inc.location?.name,
-      Camera: inc.location?.cameraId,
+      Camera: inc.cameraId || inc.location?.cameraId,
       Confidence: `${Math.round((inc.confidence || 0) * 100)}%`,
       "People Detected": inc.persons_detected || 0,
       "Threat Score": inc.threat_score || 0,
@@ -307,6 +292,12 @@ useEffect(() => {
               Export CSV
             </button>
           </div>
+
+          {error && (
+            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 shadow-sm">
+              {error}
+            </div>
+          )}
 
           {/* STATS CARDS */}
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
