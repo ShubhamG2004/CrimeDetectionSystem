@@ -144,28 +144,33 @@ export default function CameraDetailPage() {
   useEffect(() => {
     if (checkedRef.current || !mounted) return;
     checkedRef.current = true;
+    let intervalId;
 
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
+        if (intervalId) clearInterval(intervalId);
         router.replace("/login");
         return;
       }
 
       if (localStorage.getItem("role") !== ROLES.OPERATOR) {
+        if (intervalId) clearInterval(intervalId);
         router.replace("/dashboard");
         return;
       }
 
       await loadData(user);
 
-      const interval = setInterval(() => {
+      // Refresh less aggressively to lower Firestore read pressure.
+      intervalId = setInterval(() => {
         loadData(user);
-      }, 5000);
-
-      return () => clearInterval(interval);
+      }, 30000);
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      unsubscribe();
+    };
   }, [router, loadData, mounted]);
 
   const latestIncident = incidents[0] || null;

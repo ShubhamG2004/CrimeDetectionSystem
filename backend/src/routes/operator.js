@@ -3,6 +3,28 @@ const router = express.Router();
 const { admin } = require("../config/firebase");
 const { verifyToken } = require("../middleware/auth");
 
+const responseCache = new Map();
+const CACHE_TTL_MS = 15 * 1000;
+
+const getCachedResponse = (key) => {
+  const cached = responseCache.get(key);
+  if (!cached) return null;
+
+  if (Date.now() - cached.timestamp > CACHE_TTL_MS) {
+    responseCache.delete(key);
+    return null;
+  }
+
+  return cached.payload;
+};
+
+const setCachedResponse = (key, payload) => {
+  responseCache.set(key, {
+    payload,
+    timestamp: Date.now(),
+  });
+};
+
 const serializeTimestamp = (value) => {
   if (!value) return null;
 
@@ -55,6 +77,13 @@ router.get("/cameras", verifyToken, async (req, res) => {
     console.log("🔑 req.user:", req.user);
 
     const uid = req.user?.uid;
+    const cacheKey = `operator:cameras:${uid || "unknown"}`;
+
+    const cachedCameras = getCachedResponse(cacheKey);
+    if (cachedCameras) {
+      return res.json(cachedCameras);
+    }
+
     console.log("👤 Operator UID:", uid);
 
     const operatorSnap = await admin
@@ -104,6 +133,8 @@ router.get("/cameras", verifyToken, async (req, res) => {
 
     console.log("✅ Cameras returned:", cameras);
 
+    setCachedResponse(cacheKey, cameras);
+
     return res.json(cameras);
   } catch (err) {
     console.error("❌ OPERATOR CAMERAS ERROR:", err);
@@ -135,6 +166,13 @@ router.get("/cameras", verifyToken, async (req, res) => {
 router.get("/incidents", verifyToken, async (req, res) => {
   try {
     const uid = req.user?.uid;
+    const cacheKey = `operator:incidents:${uid || "unknown"}`;
+
+    const cachedIncidents = getCachedResponse(cacheKey);
+    if (cachedIncidents) {
+      return res.status(200).json(cachedIncidents);
+    }
+
     if (!uid) {
       return res.status(401).json({
         success: false,
@@ -222,11 +260,15 @@ router.get("/incidents", verifyToken, async (req, res) => {
         return bMs - aMs;
       });
 
-    return res.status(200).json({
+    const payload = {
       success: true,
       incidents,
       total: incidents.length,
-    });
+    };
+
+    setCachedResponse(cacheKey, payload);
+
+    return res.status(200).json(payload);
   } catch (err) {
     console.error("❌ OPERATOR INCIDENTS ERROR:", err);
     const errorText = String(err?.message || "").toLowerCase();

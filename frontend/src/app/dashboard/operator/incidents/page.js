@@ -282,8 +282,11 @@ export default function OperatorIncidentsPage() {
   // ✅ Auth + Initial Load
   // -------------------------------
   useEffect(() => {
+    let intervalId;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
+        if (intervalId) clearInterval(intervalId);
         router.replace("/login");
         return;
       }
@@ -291,21 +294,23 @@ export default function OperatorIncidentsPage() {
       const role = localStorage.getItem("role");
 
       if (role !== "operator") {
+        if (intervalId) clearInterval(intervalId);
         router.replace("/dashboard");
         return;
       }
 
       await fetchAlerts(user);
 
-      // 🔁 Auto refresh every 5 sec
-      const interval = setInterval(() => {
+      // Refresh less aggressively to reduce backend Firestore reads.
+      intervalId = setInterval(() => {
         fetchAlerts(user);
-      }, 5000);
-
-      return () => clearInterval(interval);
+      }, 30000);
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      unsubscribe();
+    };
   }, [router, fetchAlerts]);
 
   // -------------------------------

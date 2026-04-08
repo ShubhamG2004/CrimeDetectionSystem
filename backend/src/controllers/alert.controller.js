@@ -2,8 +2,25 @@ const { db, admin } = require("../config/firebase");
 const { ALERT_STATUS } = require("../services/alert.service");
 
 const COLLECTION = "alerts";
+const listCache = new Map();
+const LIST_CACHE_TTL_MS = 15 * 1000;
 
 const normalizeStatus = (status) => String(status || "").toLowerCase();
+
+const getListCacheKey = ({ status, stationId, limit }) =>
+  `alerts:list:${status || "all"}:${stationId || "all"}:${Number(limit || 100)}`;
+
+const getCachedList = (key) => {
+  const cached = listCache.get(key);
+  if (!cached) return null;
+
+  if (Date.now() - cached.timestamp > LIST_CACHE_TTL_MS) {
+    listCache.delete(key);
+    return null;
+  }
+
+  return cached.payload;
+};
 
 // 🔧 Convert Firestore Timestamps to ISO strings for JSON serialization
 const serializeAlert = (alertDoc) => {
@@ -34,6 +51,13 @@ const serializeAlert = (alertDoc) => {
 exports.listAlerts = async (req, res) => {
   try {
     const { status, stationId, limit } = req.query;
+    const cacheKey = getListCacheKey({ status, stationId, limit });
+    const cachedPayload = getCachedList(cacheKey);
+
+    if (cachedPayload) {
+      return res.status(200).json(cachedPayload);
+    }
+
     let query = db.collection(COLLECTION).orderBy("createdAt", "desc");
 
     if (status) {
@@ -47,7 +71,13 @@ exports.listAlerts = async (req, res) => {
     const docs = await query.limit(Number(limit || 100)).get();
     const data = docs.docs.map(serializeAlert);
 
-    res.status(200).json({ success: true, data });
+    const payload = { success: true, data };
+    listCache.set(cacheKey, {
+      payload,
+      timestamp: Date.now(),
+    });
+
+    res.status(200).json(payload);
   } catch (err) {
     console.error("listAlerts error:", err.message);
     res.status(500).json({ success: false, message: "Failed to load alerts" });

@@ -8,14 +8,8 @@ import { ROLES } from "@/lib/roles";
 import {
   Camera,
   ChevronRight,
-  Clock3,
-  Image as ImageIcon,
   MapPin,
   Search,
-  Shield,
-  Signal,
-  Sparkles,
-  Users,
 } from "lucide-react";
 
 import Navbar from "@/components/Navbar";
@@ -57,7 +51,6 @@ export default function OperatorCamerasPage() {
   const router = useRouter();
   const [cameras, setCameras] = useState([]);
   const [incidents, setIncidents] = useState([]);
-  const [selectedCameraId, setSelectedCameraId] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -116,12 +109,6 @@ export default function OperatorCamerasPage() {
 
       setCameras(normalizedCameras);
       setIncidents(normalizedIncidents);
-      setSelectedCameraId((current) => {
-        if (current && normalizedCameras.some((camera) => camera.cameraId === current)) {
-          return current;
-        }
-        return normalizedCameras[0]?.cameraId || "";
-      });
       setError("");
       setLoading(false);
     } catch (err) {
@@ -142,27 +129,33 @@ export default function OperatorCamerasPage() {
   }, []);
 
   useEffect(() => {
+    let intervalId;
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
+        if (intervalId) clearInterval(intervalId);
         router.replace("/login");
         return;
       }
 
       if (localStorage.getItem("role") !== ROLES.OPERATOR) {
+        if (intervalId) clearInterval(intervalId);
         router.replace("/dashboard");
         return;
       }
 
       await loadData(user);
 
-      const interval = setInterval(() => {
+      // Refresh less aggressively to lower Firestore read pressure.
+      intervalId = setInterval(() => {
         loadData(user);
-      }, 5000);
-
-      return () => clearInterval(interval);
+      }, 30000);
     });
 
-    return () => unsubscribe();
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+      unsubscribe();
+    };
   }, [router, loadData]);
 
   const filteredCameras = useMemo(() => {
@@ -190,22 +183,6 @@ export default function OperatorCamerasPage() {
       return haystack.includes(query);
     });
   }, [cameras, searchQuery]);
-
-  const selectedCamera = useMemo(
-    () => filteredCameras.find((camera) => camera.cameraId === selectedCameraId) || filteredCameras[0] || null,
-    [filteredCameras, selectedCameraId]
-  );
-
-  const selectedCameraIncidents = useMemo(() => {
-    if (!selectedCamera) return [];
-
-    return incidents.filter((incident) => {
-      const incidentCameraId = incident.cameraId || incident.location?.cameraId;
-      return incidentCameraId === selectedCamera.cameraId;
-    });
-  }, [incidents, selectedCamera]);
-
-  const latestIncident = selectedCameraIncidents[0] || null;
 
   const cameraCounts = useMemo(() => {
     const active = cameras.filter((camera) => getCameraStatus(camera) === "active").length;
@@ -310,202 +287,53 @@ export default function OperatorCamerasPage() {
           )}
 
           {!loading && !error && filteredCameras.length > 0 && (
-            <div className="grid gap-4 xl:grid-cols-[0.95fr_1.35fr]">
-              <div className="space-y-3">
-                <div className="sticky top-0 z-10 rounded-2xl border border-slate-200 bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm">
-                  Assigned Cameras ({filteredCameras.length})
-                </div>
-
-                <div className="space-y-3">
-                  {filteredCameras.map((camera) => {
-                    const isSelected = camera.cameraId === selectedCamera?.cameraId;
-                    const status = getCameraStatus(camera);
-
-                    return (
-                      <button
-                        key={camera.cameraId}
-                        onClick={() => setSelectedCameraId(camera.cameraId)}
-                        className={`w-full rounded-2xl border p-4 text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-lg ${
-                          isSelected
-                            ? "border-slate-900 bg-slate-900 text-white"
-                            : "border-slate-200 bg-white text-slate-900"
-                        }`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className={`truncate text-base font-semibold ${isSelected ? "text-white" : "text-slate-900"}`}>
-                              {getCameraName(camera)}
-                            </p>
-                            <p className={`mt-1 flex items-center gap-1 truncate text-sm ${isSelected ? "text-slate-200" : "text-slate-500"}`}>
-                              <MapPin className="h-3.5 w-3.5" />
-                              {getCameraLocation(camera)}
-                            </p>
-                          </div>
-                          <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
-                            status === "active"
-                              ? isSelected
-                                ? "bg-white/15 text-white"
-                                : "bg-emerald-100 text-emerald-700"
-                              : status === "pending"
-                              ? isSelected
-                                ? "bg-white/15 text-white"
-                                : "bg-amber-100 text-amber-700"
-                              : isSelected
-                              ? "bg-white/15 text-white"
-                              : "bg-slate-100 text-slate-600"
-                          }`}>
-                            {status}
-                          </div>
-                        </div>
-
-                        <div className="mt-3 flex items-center justify-between text-xs">
-                          <span className={`${isSelected ? "text-slate-200" : "text-slate-500"}`}>
-                            {camera.policeStationName || "Police Station"}
-                          </span>
-                          <span className={`inline-flex items-center gap-1 ${isSelected ? "text-slate-200" : "text-slate-500"}`}>
-                            Open live view <ChevronRight className="h-3.5 w-3.5" />
-                          </span>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
+            <div className="space-y-3">
+              <div className="sticky top-0 z-10 rounded-2xl border border-slate-200 bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm">
+                Assigned Cameras ({filteredCameras.length})
               </div>
 
-              <div className="space-y-4">
-                <div className="rounded-3xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                  <div className="border-b border-slate-200 bg-gradient-to-r from-slate-900 to-slate-700 px-5 py-4 text-white">
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <p className="text-xs uppercase tracking-[0.2em] text-slate-300">Live Monitoring</p>
-                        <h3 className="mt-1 text-2xl font-semibold">
-                          {selectedCamera ? getCameraName(selectedCamera) : "Select a camera"}
-                        </h3>
-                        <p className="mt-1 text-sm text-slate-300">
-                          {selectedCamera ? getCameraLocation(selectedCamera) : "Choose an assigned camera to begin monitoring"}
-                        </p>
-                      </div>
-                      <div className="rounded-2xl border border-white/10 bg-white/10 px-3 py-2 text-right">
-                        <p className="text-[10px] uppercase tracking-wide text-slate-200">Monitoring</p>
-                        <p className="mt-1 text-sm font-semibold">{selectedCamera?.status || "active"}</p>
-                      </div>
-                    </div>
-                  </div>
+              <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {filteredCameras.map((camera) => {
+                  const status = getCameraStatus(camera);
 
-                  <div className="grid gap-0 lg:grid-cols-[1.2fr_0.8fr]">
-                    <div className="border-b border-slate-200 lg:border-b-0 lg:border-r lg:border-slate-200">
-                      {latestIncident?.imageUrl ? (
-                        <div className="relative">
-                          <img
-                            src={latestIncident.imageUrl}
-                            alt="Live monitoring"
-                            className="h-[430px] w-full object-cover"
-                          />
-                          <div className="absolute left-4 top-4 inline-flex items-center gap-2 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white backdrop-blur">
-                            <Signal className="h-3.5 w-3.5 text-emerald-300" />
-                            Live image feed
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="flex h-[430px] flex-col items-center justify-center bg-slate-50 px-6 text-center">
-                          <div className="mb-4 rounded-full border border-slate-200 bg-white p-4 shadow-sm">
-                            <ImageIcon className="h-8 w-8 text-slate-400" />
-                          </div>
-                          <h4 className="text-lg font-semibold text-slate-900">No live image yet</h4>
-                          <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
-                            This camera will show the latest incident image here as soon as new activity is detected.
+                  return (
+                    <button
+                      key={camera.cameraId}
+                      onClick={() => router.push(`/dashboard/operator/cameras/${camera.cameraId}`)}
+                      className="w-full rounded-2xl border border-slate-200 bg-white p-4 text-left text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-lg"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-base font-semibold text-slate-900">
+                            {getCameraName(camera)}
+                          </p>
+                          <p className="mt-1 flex items-center gap-1 truncate text-sm text-slate-500">
+                            <MapPin className="h-3.5 w-3.5" />
+                            {getCameraLocation(camera)}
                           </p>
                         </div>
-                      )}
-                    </div>
-
-                    <div className="space-y-4 p-5">
-                      <div className="grid grid-cols-2 gap-3 text-sm">
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
-                          <p className="text-xs font-semibold uppercase text-slate-500">Camera ID</p>
-                          <p className="mt-1 font-mono text-slate-900">{selectedCamera?.cameraId || "N/A"}</p>
-                        </div>
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
-                          <p className="text-xs font-semibold uppercase text-slate-500">Police Station</p>
-                          <p className="mt-1 text-slate-900">{selectedCamera?.policeStationName || "-"}</p>
-                        </div>
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
-                          <p className="text-xs font-semibold uppercase text-slate-500">Last Update</p>
-                          <p className="mt-1 text-slate-900">{formatDateTime(latestIncident?.createdAt || latestIncident?.updatedAt)}</p>
-                        </div>
-                        <div className="rounded-2xl border border-slate-200 bg-slate-50 p-3 shadow-sm">
-                          <p className="text-xs font-semibold uppercase text-slate-500">Incident Count</p>
-                          <p className="mt-1 text-slate-900">{selectedCameraIncidents.length}</p>
+                        <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+                          status === "active"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : status === "pending"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-slate-100 text-slate-600"
+                        }`}>
+                          {status}
                         </div>
                       </div>
 
-                      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                        <div className="mb-3 flex items-center justify-between">
-                          <div>
-                            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Recent Activity</p>
-                            <h4 className="text-lg font-semibold text-slate-900">Latest images</h4>
-                          </div>
-                          <Sparkles className="h-4 w-4 text-slate-400" />
-                        </div>
-
-                        <div className="space-y-3">
-                          {selectedCameraIncidents.slice(0, 4).map((incident) => (
-                            <div key={incident.id} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 p-2">
-                              <img
-                                src={incident.imageUrl}
-                                alt="Incident thumbnail"
-                                className="h-16 w-16 rounded-lg object-cover"
-                              />
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium text-slate-900">
-                                  {incident.crime_type?.replace(/_/g, " ") || "Incident"}
-                                </p>
-                                <p className="mt-0.5 text-xs text-slate-500">
-                                  {formatDateTime(incident.createdAt || incident.updatedAt)}
-                                </p>
-                              </div>
-                              <div className="flex items-center gap-1 rounded-full bg-slate-900 px-2 py-1 text-[10px] font-medium text-white">
-                                <Clock3 className="h-3 w-3" />
-                                Live
-                              </div>
-                            </div>
-                          ))}
-
-                          {selectedCameraIncidents.length === 0 && (
-                            <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-5 text-center text-sm text-slate-500">
-                              No incident images available for this camera yet.
-                            </div>
-                          )}
-                        </div>
+                      <div className="mt-3 flex items-center justify-between text-xs">
+                        <span className="text-slate-500">
+                          {camera.policeStationName || "Police Station"}
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-slate-500">
+                          Open live view <ChevronRight className="h-3.5 w-3.5" />
+                        </span>
                       </div>
-
-                      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 shadow-sm">
-                        <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                          <Shield className="h-4 w-4 text-slate-500" />
-                          Camera Profile
-                        </div>
-                        <div className="mt-3 grid grid-cols-2 gap-3 text-sm">
-                          <div>
-                            <p className="text-xs uppercase text-slate-500">Name</p>
-                            <p className="mt-1 text-slate-900">{selectedCamera ? getCameraName(selectedCamera) : "-"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs uppercase text-slate-500">Location</p>
-                            <p className="mt-1 text-slate-900">{selectedCamera ? getCameraLocation(selectedCamera) : "-"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs uppercase text-slate-500">Latitude</p>
-                            <p className="mt-1 text-slate-900">{selectedCamera?.latitude ?? "-"}</p>
-                          </div>
-                          <div>
-                            <p className="text-xs uppercase text-slate-500">Longitude</p>
-                            <p className="mt-1 text-slate-900">{selectedCamera?.longitude ?? "-"}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
