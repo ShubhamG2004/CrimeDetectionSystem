@@ -4,6 +4,7 @@ const { admin } = require("../config/firebase");
 const { verifyToken, requireAdmin } = require("../middleware/auth");
 const { logOperatorActivity } = require("../utils/logOperatorActivity");
 const psCtrl = require("../controllers/policeStation.controller");
+const cache = require("../config/cache");
 
 /* ======================================================
    ➕ CREATE OPERATOR (ADMIN ONLY)
@@ -74,6 +75,8 @@ router.post(
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
         createdBy: req.user.uid,
       });
+      await cache.delByPrefix("operator:cameras:");
+      await cache.delByPrefix("operator:incidents:");
 
       // 🧾 LOG
       await logOperatorActivity({

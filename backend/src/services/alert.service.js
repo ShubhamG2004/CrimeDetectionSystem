@@ -2,6 +2,7 @@ const nodemailer = require("nodemailer");
 const twilio = require("twilio");
 const { db, admin } = require("../config/firebase");
 const { findNearestStation } = require("../controllers/policeStation.controller");
+const cache = require("../config/cache");
 
 const ALERT_COLLECTION = "alerts";
 const ALERT_STATUS = {
@@ -298,6 +299,7 @@ const scheduleRetry = (alertId) => {
       }
 
       await docRef.update(updatePayload);
+      await cache.delByPrefix("alerts:list:");
 
       scheduleRetry(alertId);
     } catch (err) {
@@ -365,6 +367,7 @@ const triggerStationAlert = async ({
       : null,
     updatedAt: admin.firestore.FieldValue.serverTimestamp(),
   });
+  await cache.delByPrefix("alerts:list:");
 
   scheduleRetry(docRef.id);
 

@@ -146,10 +146,10 @@ export default function OperatorCamerasPage() {
 
       await loadData(user);
 
-      // Refresh less aggressively to lower Firestore read pressure.
+      // Refresh every 2 minutes to match backend cache TTL and minimize Firestore reads.
       intervalId = setInterval(() => {
         loadData(user);
-      }, 30000);
+      }, 120000);
     });
 
     return () => {

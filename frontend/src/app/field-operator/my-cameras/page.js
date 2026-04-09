@@ -106,6 +106,7 @@ export default function MyCamerasPage() {
                   <th className="p-3 text-left">Location</th>
                   <th className="p-3 text-left">Police Station</th>
                   <th className="p-3 text-center">Status</th>
+                  <th className="p-3 text-center">ESP32</th>
                 </tr>
               </thead>
               <tbody className="text-slate-800 text-sm">
@@ -118,6 +119,18 @@ export default function MyCamerasPage() {
                       <span className={`px-3 py-1 rounded-full text-xs font-semibold ${getStatusClass(cam.status)}`}>
                         {(cam.status || "pending").toUpperCase()}
                       </span>
+                    </td>
+                    <td className="p-3 text-center">
+                      {(cam.status || "pending") === "approved" ? (
+                        <a
+                          href="/field-operator/connect-esp32"
+                          className="px-3 py-1 rounded-lg text-xs font-medium border border-cyan-300 text-cyan-700 hover:bg-cyan-50"
+                        >
+                          Configure
+                        </a>
+                      ) : (
+                        <span className="text-xs text-slate-400">Available after approval</span>
+                      )}
                     </td>
                   </tr>
                 ))}

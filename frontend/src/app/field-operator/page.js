@@ -134,10 +134,11 @@ export default function FieldOperatorDashboard() {
         <div className="px-6 pb-6">
           <div className="app-card p-5">
             <h4 className="text-lg font-semibold text-slate-900">Next Actions</h4>
-            <p className="text-slate-600 mt-2">Register new cameras from the field and track approval status from My Cameras.</p>
-            <div className="mt-4 flex gap-3">
+            <p className="text-slate-600 mt-2">Register cameras, track approval status, and configure approved cameras for ESP32 live uploads.</p>
+            <div className="mt-4 flex gap-3 flex-wrap">
               <a href="/field-operator/add-camera" className="app-button">Add Camera</a>
               <a href="/field-operator/my-cameras" className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50">My Cameras</a>
+              <a href="/field-operator/connect-esp32" className="px-4 py-2 rounded-lg border border-cyan-300 text-cyan-700 hover:bg-cyan-50">Connect ESP32</a>
             </div>
           </div>
         </div>

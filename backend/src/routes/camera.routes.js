@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const { db, admin } = require("../config/firebase");
 const { verifyToken, requireAdmin } = require("../middleware/auth");
+const cache = require("../config/cache");
 
 const fetchAssignedStation = async (stationId) => {
   if (!stationId) {
@@ -118,6 +119,8 @@ router.post("/", verifyToken, requireAdmin, async (req, res) => {
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
+    await cache.delByPrefix("operator:cameras:");
+
     res.status(201).json({
       success: true,
       message: "Camera added successfully",
@@ -201,6 +204,8 @@ router.put("/:cameraId", verifyToken, requireAdmin, async (req, res) => {
     }
 
     await db.collection("cameras").doc(cameraId).update(updates);
+    await cache.delByPrefix("operator:cameras:");
+    await cache.delByPrefix("operator:incidents:");
 
     res.json({ success: true, message: "Camera updated successfully" });
   } catch (err) {
@@ -217,6 +222,8 @@ router.delete("/:cameraId", verifyToken, requireAdmin, async (req, res) => {
     const { cameraId } = req.params;
 
     await db.collection("cameras").doc(cameraId).delete();
+    await cache.delByPrefix("operator:cameras:");
+    await cache.delByPrefix("operator:incidents:");
 
     res.status(200).json({
       success: true,

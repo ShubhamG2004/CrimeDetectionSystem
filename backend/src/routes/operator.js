@@ -1,29 +1,13 @@
+const crypto = require("crypto");
 const express = require("express");
+const axios = require("axios");
+const FormData = require("form-data");
+const os = require("os");
 const router = express.Router();
 const { admin } = require("../config/firebase");
 const { verifyToken } = require("../middleware/auth");
-
-const responseCache = new Map();
-const CACHE_TTL_MS = 15 * 1000;
-
-const getCachedResponse = (key) => {
-  const cached = responseCache.get(key);
-  if (!cached) return null;
-
-  if (Date.now() - cached.timestamp > CACHE_TTL_MS) {
-    responseCache.delete(key);
-    return null;
-  }
-
-  return cached.payload;
-};
-
-const setCachedResponse = (key, payload) => {
-  responseCache.set(key, {
-    payload,
-    timestamp: Date.now(),
-  });
-};
+const cache = require("../config/cache");
+const cloudinary = require("../config/cloudinary");
 
 const serializeTimestamp = (value) => {
   if (!value) return null;
@@ -66,6 +50,197 @@ const dedupeIncidents = (incidents) => {
   return unique;
 };
 
+const toRoutePath = (value, fallback) => {
+  const raw = String(value || fallback || "").trim();
+  if (!raw) return fallback;
+  return raw.startsWith("/") ? raw : `/${raw}`;
+};
+
+const normalizeDeviceHost = (value) => {
+  if (!value) return "";
+  return String(value)
+    .trim()
+    .replace(/^https?:\/\//i, "")
+    .replace(/\/+$/, "");
+};
+
+const toHttpUrl = (value) => {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `http://${raw}`;
+};
+
+const getLocalIpv4Address = () => {
+  const nets = os.networkInterfaces();
+  for (const entries of Object.values(nets)) {
+    for (const net of entries || []) {
+      const family = typeof net.family === "string" ? net.family : String(net.family);
+      if (family === "IPv4" && !net.internal && net.address && !net.address.startsWith("169.254.")) {
+        return net.address;
+      }
+    }
+  }
+  return null;
+};
+
+const resolveBackendBaseUrl = (req) => {
+  const explicitPublicUrl = String(process.env.BACKEND_PUBLIC_URL || "").trim();
+  if (explicitPublicUrl) {
+    return explicitPublicUrl.replace(/\/+$/, "");
+  }
+
+  const protocol = req.protocol || "http";
+  const hostHeader = String(req.get("host") || "").trim();
+  const fallbackHost = hostHeader || "localhost:5000";
+  const [hostname, port = "5000"] = fallbackHost.split(":");
+  const normalizedHost = String(hostname || "").toLowerCase();
+  const isLocalHost =
+    normalizedHost === "localhost" ||
+    normalizedHost === "127.0.0.1" ||
+    normalizedHost === "::1";
+
+  if (!isLocalHost) {
+    return `${protocol}://${fallbackHost}`;
+  }
+
+  const localIp = getLocalIpv4Address();
+  if (!localIp) {
+    return `${protocol}://${fallbackHost}`;
+  }
+
+  return `${protocol}://${localIp}:${port}`;
+};
+
+const buildCaptureCandidates = (cameraData = {}) => {
+  const candidates = [];
+
+  const configuredCapture = cameraData?.esp32?.captureUrl || cameraData?.esp32CaptureUrl;
+  const configuredStream = cameraData?.esp32?.streamUrl || cameraData?.esp32StreamUrl;
+  const ipAddress = cameraData?.esp32?.ipAddress;
+
+  const pushCandidate = (url) => {
+    const normalized = toHttpUrl(url);
+    if (!normalized) return;
+    candidates.push(normalized);
+  };
+
+  pushCandidate(configuredCapture);
+
+  if (configuredStream) {
+    const streamUrl = toHttpUrl(configuredStream);
+    pushCandidate(streamUrl.replace(/\/stream\/?$/i, "/capture"));
+    pushCandidate(streamUrl.replace(/\/stream\/?$/i, "/snapshot"));
+    pushCandidate(streamUrl.replace(/\/stream\/?$/i, "/jpg"));
+  }
+
+  if (ipAddress) {
+    const host = normalizeDeviceHost(ipAddress);
+    pushCandidate(`http://${host}/capture`);
+    pushCandidate(`http://${host}/snapshot`);
+    pushCandidate(`http://${host}/jpg`);
+  }
+
+  return [...new Set(candidates)];
+};
+
+const buildStreamCandidates = (cameraData = {}) => {
+  const candidates = [];
+  const configuredStream = cameraData?.esp32?.streamUrl || cameraData?.esp32StreamUrl;
+  const ipAddress = cameraData?.esp32?.ipAddress;
+
+  const pushCandidate = (url) => {
+    const normalized = toHttpUrl(url);
+    if (!normalized) return;
+    candidates.push(normalized);
+  };
+
+  pushCandidate(configuredStream);
+
+  if (ipAddress) {
+    const host = normalizeDeviceHost(ipAddress);
+    pushCandidate(`http://${host}/stream`);
+  }
+
+  return [...new Set(candidates)];
+};
+
+const extractJpegFromMjpegStream = (stream, timeoutMs = 12000) =>
+  new Promise((resolve, reject) => {
+    let buffer = Buffer.alloc(0);
+    const startMarker = Buffer.from([0xff, 0xd8]);
+    const endMarker = Buffer.from([0xff, 0xd9]);
+
+    const cleanup = () => {
+      stream.removeAllListeners("data");
+      stream.removeAllListeners("error");
+      stream.removeAllListeners("end");
+      stream.removeAllListeners("close");
+    };
+
+    const timer = setTimeout(() => {
+      cleanup();
+      reject(new Error("Timed out while reading MJPEG stream"));
+    }, timeoutMs);
+
+    stream.on("data", (chunk) => {
+      buffer = Buffer.concat([buffer, chunk]);
+
+      const start = buffer.indexOf(startMarker);
+      if (start === -1) {
+        if (buffer.length > 1024 * 1024) {
+          buffer = buffer.slice(-256 * 1024);
+        }
+        return;
+      }
+
+      const end = buffer.indexOf(endMarker, start + 2);
+      if (end === -1) return;
+
+      clearTimeout(timer);
+      cleanup();
+      resolve(buffer.slice(start, end + 2));
+    });
+
+    stream.on("error", (err) => {
+      clearTimeout(timer);
+      cleanup();
+      reject(err);
+    });
+
+    stream.on("end", () => {
+      clearTimeout(timer);
+      cleanup();
+      reject(new Error("MJPEG stream ended before a frame was captured"));
+    });
+
+    stream.on("close", () => {
+      clearTimeout(timer);
+      cleanup();
+      reject(new Error("MJPEG stream closed before a frame was captured"));
+    });
+  });
+
+const calculateThreatScore = ({ confidence = 0, threat_level = "LOW" }) => {
+  let score = Math.round(Number(confidence || 0) * 100);
+
+  switch (String(threat_level || "").toUpperCase()) {
+    case "CRITICAL":
+      score += 40;
+      break;
+    case "HIGH":
+      score += 25;
+      break;
+    case "MEDIUM":
+      score += 15;
+      break;
+    default:
+      break;
+  }
+
+  return Math.min(100, score);
+};
+
 /**
  * ======================================================
  * 🎥 Get cameras assigned to logged-in operator
@@ -79,7 +254,7 @@ router.get("/cameras", verifyToken, async (req, res) => {
     const uid = req.user?.uid;
     const cacheKey = `operator:cameras:${uid || "unknown"}`;
 
-    const cachedCameras = getCachedResponse(cacheKey);
+    const cachedCameras = await cache.get(cacheKey);
     if (cachedCameras) {
       return res.json(cachedCameras);
     }
@@ -133,7 +308,7 @@ router.get("/cameras", verifyToken, async (req, res) => {
 
     console.log("✅ Cameras returned:", cameras);
 
-    setCachedResponse(cacheKey, cameras);
+    await cache.set(cacheKey, cameras, 120);
 
     return res.json(cameras);
   } catch (err) {
@@ -168,7 +343,7 @@ router.get("/incidents", verifyToken, async (req, res) => {
     const uid = req.user?.uid;
     const cacheKey = `operator:incidents:${uid || "unknown"}`;
 
-    const cachedIncidents = getCachedResponse(cacheKey);
+    const cachedIncidents = await cache.get(cacheKey);
     if (cachedIncidents) {
       return res.status(200).json(cachedIncidents);
     }
@@ -266,7 +441,7 @@ router.get("/incidents", verifyToken, async (req, res) => {
       total: incidents.length,
     };
 
-    setCachedResponse(cacheKey, payload);
+    await cache.set(cacheKey, payload, 120);
 
     return res.status(200).json(payload);
   } catch (err) {
@@ -288,6 +463,247 @@ router.get("/incidents", verifyToken, async (req, res) => {
       incidents: [],
       total: 0,
       message: "Failed to fetch incidents",
+    });
+  }
+});
+
+/**
+ * ======================================================
+ * 📷 Capture ESP32 frame and run AI detection (operator only)
+ * ======================================================
+ */
+router.post("/capture-detect/:cameraId", verifyToken, async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    const role = req.user?.role;
+    const cameraId = String(req.params?.cameraId || "").trim();
+
+    if (!uid || role !== "operator") {
+      return res.status(403).json({
+        success: false,
+        message: "Only operators can capture frames",
+      });
+    }
+
+    if (!cameraId) {
+      return res.status(400).json({
+        success: false,
+        message: "cameraId is required",
+      });
+    }
+
+    const operatorSnap = await admin.firestore().collection("operators").doc(uid).get();
+    if (!operatorSnap.exists) {
+      return res.status(403).json({
+        success: false,
+        message: "Operator profile not found",
+      });
+    }
+
+    const operatorData = operatorSnap.data() || {};
+    const assignedCameras = Array.isArray(operatorData.cameras)
+      ? operatorData.cameras.filter(Boolean)
+      : [];
+
+    if (!assignedCameras.includes(cameraId)) {
+      return res.status(403).json({
+        success: false,
+        message: "You are not assigned to this camera",
+      });
+    }
+
+    const cameraSnap = await admin.firestore().collection("cameras").doc(cameraId).get();
+    if (!cameraSnap.exists) {
+      return res.status(404).json({
+        success: false,
+        message: "Camera not found",
+      });
+    }
+
+    const cameraData = cameraSnap.data() || {};
+    const captureCandidates = buildCaptureCandidates(cameraData);
+    const streamCandidates = buildStreamCandidates(cameraData);
+
+    if (!captureCandidates.length) {
+      return res.status(400).json({
+        success: false,
+        message: "ESP32 capture URL is not configured for this camera",
+      });
+    }
+
+    let captureResponse = null;
+    let captureError = null;
+    let usedCaptureUrl = "";
+    const attemptedUrls = [];
+
+    for (const candidateUrl of captureCandidates) {
+      attemptedUrls.push(candidateUrl);
+      try {
+        const response = await axios.get(candidateUrl, {
+          responseType: "arraybuffer",
+          timeout: 15000,
+          headers: {
+            Accept: "image/jpeg,image/*,*/*",
+            Connection: "close",
+          },
+          validateStatus: (status) => status >= 200 && status < 300,
+        });
+
+        captureResponse = response;
+        usedCaptureUrl = candidateUrl;
+        break;
+      } catch (err) {
+        captureError = err;
+      }
+    }
+
+    if (!captureResponse) {
+      for (const streamUrl of streamCandidates) {
+        attemptedUrls.push(`${streamUrl}#mjpeg`);
+        try {
+          const streamRes = await axios.get(streamUrl, {
+            responseType: "stream",
+            timeout: 15000,
+            headers: {
+              Accept: "multipart/x-mixed-replace,image/jpeg,*/*",
+              Connection: "close",
+            },
+            validateStatus: (status) => status >= 200 && status < 300,
+          });
+
+          const frameBuffer = await extractJpegFromMjpegStream(streamRes.data, 12000);
+          captureResponse = {
+            data: frameBuffer,
+            headers: {
+              "content-type": "image/jpeg",
+            },
+          };
+          usedCaptureUrl = `${streamUrl}#mjpeg`;
+          break;
+        } catch (err) {
+          captureError = err;
+        }
+      }
+    }
+
+    if (!captureResponse) {
+      return res.status(502).json({
+        success: false,
+        message: "Failed to fetch frame from ESP32 device",
+        detail: captureError?.message || "All capture URL attempts failed",
+        attemptedUrls,
+      });
+    }
+
+    const imageBuffer = Buffer.from(captureResponse.data || []);
+    if (!imageBuffer.length) {
+      return res.status(502).json({
+        success: false,
+        message: "Captured frame is empty",
+      });
+    }
+
+    const contentType = captureResponse.headers?.["content-type"] || "image/jpeg";
+
+    const formData = new FormData();
+    formData.append("image", imageBuffer, {
+      filename: "capture.jpg",
+      contentType,
+    });
+
+    let aiPayload = {
+      type: "UNKNOWN",
+      confidence: 0,
+      threat_level: "LOW",
+      persons_detected: 0,
+      activities: [],
+      signals: [],
+      crime_detected: false,
+    };
+    let aiError = null;
+
+    try {
+      const aiRes = await axios.post("http://127.0.0.1:8000/detect-image", formData, {
+        headers: formData.getHeaders(),
+        timeout: 30000,
+      });
+      aiPayload = {
+        ...aiPayload,
+        ...(aiRes.data || {}),
+      };
+    } catch (aiErr) {
+      aiError = aiErr.message;
+      console.warn("⚠️ AI detection failed for captured frame:", aiError);
+    }
+
+    const {
+      type = "UNKNOWN",
+      confidence = 0,
+      threat_level = "LOW",
+      persons_detected = 0,
+      activities = [],
+      signals = [],
+      crime_detected = false,
+    } = aiPayload;
+
+    const threat_score = calculateThreatScore({ confidence, threat_level });
+    const location = {
+      cameraId,
+      name: cameraData.area || cameraData.location || cameraData.name || "Unknown",
+      lat: cameraData.latitude !== undefined ? Number(cameraData.latitude) : null,
+      lng: cameraData.longitude !== undefined ? Number(cameraData.longitude) : null,
+    };
+
+    const imageBase64 = `data:${contentType};base64,${imageBuffer.toString("base64")}`;
+    const uploadRes = await cloudinary.uploader.upload(imageBase64, {
+      folder: "crime-detection/incidents",
+    });
+
+    const incidentData = {
+      crime_type: type,
+      confidence: Number(confidence) || 0,
+      threat_level,
+      threat_score,
+      cameraId,
+      persons_detected: Number(persons_detected) || 0,
+      activities: Array.isArray(activities) ? activities : [],
+      signals: Array.isArray(signals) ? signals : [],
+      crime_detected: Boolean(crime_detected),
+      location,
+      imageUrl: uploadRes.secure_url,
+      source: "operator-capture-detection",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    const incidentRef = await admin.firestore().collection("incidents").add(incidentData);
+    await cache.delByPrefix("operator:incidents:");
+
+    return res.status(200).json({
+      success: true,
+      incidentId: incidentRef.id,
+      data: {
+        imageUrl: uploadRes.secure_url,
+        crime_type: type,
+        confidence,
+        threat_level,
+        persons_detected,
+        activities,
+        signals,
+        crime_detected,
+        threat_score,
+        location,
+        source: "operator-capture-detection",
+        createdAt: new Date().toISOString(),
+        ai_error: aiError,
+        capture_url: usedCaptureUrl,
+      },
+    });
+  } catch (err) {
+    console.error("❌ CAPTURE DETECT ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to capture and detect frame",
     });
   }
 });
@@ -391,6 +807,201 @@ router.get("/my-cameras", verifyToken, async (req, res) => {
     return res.status(500).json({
       success: false,
       message: "Failed to fetch cameras",
+      error: process.env.NODE_ENV === "development" ? err.message : undefined,
+    });
+  }
+});
+
+/**
+ * ======================================================
+ * ✅ GET APPROVED CAMERAS (FIELD OPERATOR)
+ * Return only approved cameras owned by current field operator
+ * ======================================================
+ */
+router.get("/approved-cameras", verifyToken, async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    const role = req.user?.role;
+
+    if (role !== "field_operator") {
+      return res.status(403).json({
+        success: false,
+        message: "Only field operators can view approved cameras",
+      });
+    }
+
+    const snap = await admin
+      .firestore()
+      .collection("cameras")
+      .where("addedBy", "==", uid)
+      .where("status", "==", "approved")
+      .get();
+
+    const cameras = snap.docs
+      .map((doc) => {
+        const data = doc.data() || {};
+        return {
+          id: doc.id,
+          ...data,
+          esp32Configured: Boolean(data?.esp32?.configured),
+          esp32StreamUrl: data?.esp32?.streamUrl || data?.esp32StreamUrl || null,
+          esp32CaptureUrl: data?.esp32?.captureUrl || data?.esp32CaptureUrl || null,
+          lastConfiguredAt: serializeTimestamp(data?.esp32?.updatedAt),
+        };
+      })
+      .sort((a, b) => {
+        const aMs = a.approvedAt?.toMillis?.() || a.createdAt?.toMillis?.() || 0;
+        const bMs = b.approvedAt?.toMillis?.() || b.createdAt?.toMillis?.() || 0;
+        return bMs - aMs;
+      });
+
+    return res.status(200).json({
+      success: true,
+      cameras,
+      total: cameras.length,
+    });
+  } catch (err) {
+    console.error("❌ GET APPROVED CAMERAS ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch approved cameras",
+    });
+  }
+});
+
+/**
+ * ======================================================
+ * 🔌 ASSIGN ESP32 CONFIG (FIELD OPERATOR)
+ * Bind approved camera to ESP32 host + generate device token
+ * ======================================================
+ */
+router.post("/assign-esp32", verifyToken, async (req, res) => {
+  try {
+    const uid = req.user?.uid;
+    const role = req.user?.role;
+
+    if (role !== "field_operator") {
+      return res.status(403).json({
+        success: false,
+        message: "Only field operators can assign ESP32 config",
+      });
+    }
+
+    const {
+      cameraId,
+      esp32Ip,
+      streamPath = "/stream",
+      capturePath = "/capture",
+      uploadIntervalSec = 10,
+    } = req.body || {};
+
+    if (!cameraId || !esp32Ip) {
+      return res.status(400).json({
+        success: false,
+        message: "cameraId and esp32Ip are required",
+      });
+    }
+
+    const cameraRef = admin.firestore().collection("cameras").doc(String(cameraId));
+    const cameraSnap = await cameraRef.get();
+
+    if (!cameraSnap.exists) {
+      return res.status(404).json({
+        success: false,
+        message: "Camera not found",
+      });
+    }
+
+    const cameraData = cameraSnap.data() || {};
+    if (cameraData.addedBy !== uid) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only configure cameras submitted by your account",
+      });
+    }
+
+    if (cameraData.status !== "approved" || cameraData.active === false) {
+      return res.status(400).json({
+        success: false,
+        message: "Camera must be approved and active before ESP32 assignment",
+      });
+    }
+
+    const host = normalizeDeviceHost(esp32Ip);
+    if (!host) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid esp32Ip value",
+      });
+    }
+
+    const normalizedStreamPath = toRoutePath(streamPath, "/stream");
+    const normalizedCapturePath = toRoutePath(capturePath, "/capture");
+
+    const streamUrl = `http://${host}${normalizedStreamPath}`;
+    const captureUrl = `http://${host}${normalizedCapturePath}`;
+
+    const numericInterval = Number(uploadIntervalSec);
+    const intervalSec = Number.isFinite(numericInterval)
+      ? Math.max(2, Math.min(120, Math.floor(numericInterval)))
+      : 10;
+
+    const existingToken = cameraData?.esp32?.deviceToken || cameraData?.deviceToken;
+    const deviceToken = existingToken || crypto.randomBytes(24).toString("hex");
+
+    const backendBaseUrl = resolveBackendBaseUrl(req);
+    const uploadUrl = `${backendBaseUrl}/api/detect/esp32-image`;
+
+    await cameraRef.update({
+      esp32: {
+        configured: true,
+        ipAddress: host,
+        streamUrl,
+        captureUrl,
+        streamPath: normalizedStreamPath,
+        capturePath: normalizedCapturePath,
+        uploadIntervalSec: intervalSec,
+        deviceToken,
+        updatedBy: uid,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      },
+      esp32StreamUrl: streamUrl,
+      esp32CaptureUrl: captureUrl,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "ESP32 camera configuration saved",
+      camera: {
+        cameraId: cameraSnap.id,
+        cameraName: cameraData.cameraName || cameraData.name || "Unnamed Camera",
+        location: cameraData.location || cameraData.area || "Unknown",
+      },
+      esp32: {
+        ipAddress: host,
+        streamUrl,
+        captureUrl,
+        uploadIntervalSec: intervalSec,
+      },
+      uploadConfig: {
+        uploadUrl,
+        cameraId: cameraSnap.id,
+        deviceToken,
+        imageFieldName: "image",
+      },
+      arduinoConfig: {
+        CAMERA_ID: cameraSnap.id,
+        BACKEND_UPLOAD_URL: uploadUrl,
+        DEVICE_TOKEN: deviceToken,
+        UPLOAD_INTERVAL_MS: intervalSec * 1000,
+      },
+    });
+  } catch (err) {
+    console.error("❌ ASSIGN ESP32 ERROR:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to assign ESP32 config",
       error: process.env.NODE_ENV === "development" ? err.message : undefined,
     });
   }

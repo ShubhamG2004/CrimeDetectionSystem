@@ -9,12 +9,13 @@ import {
   ArrowLeft,
   MapPin,
   Signal,
-  Clock,
   AlertTriangle,
   ImageIcon,
   Calendar,
   Building2,
   Maximize,
+  Wifi,
+  Camera,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -53,6 +54,36 @@ const getCameraName = (camera) => camera?.cameraName || camera?.name || "Unnamed
 const getCameraLocation = (camera) => camera?.location || camera?.area || "Unknown location";
 const getCameraStatus = (camera) => String(camera?.status || "active").toLowerCase();
 
+const normalizeHost = (value) => String(value || "").trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
+
+const buildStreamCandidates = (camera) => {
+  const set = new Set();
+  const push = (url) => {
+    const raw = String(url || "").trim();
+    if (!raw) return;
+    const normalized = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
+    set.add(normalized);
+  };
+
+  push(camera?.esp32StreamUrl);
+  push(camera?.esp32?.streamUrl);
+
+  const host = normalizeHost(camera?.esp32?.ipAddress);
+  if (host) {
+    push(`http://${host}/stream`);
+    push(`http://${host}:81/stream`);
+    push(`http://${host}/mjpeg/1`);
+    push(`http://${host}/video`);
+  }
+
+  return Array.from(set);
+};
+
+const invertedPreviewStyle = {
+  transform: "rotate(180deg)",
+  transformOrigin: "center center",
+};
+
 export default function CameraDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -65,10 +96,36 @@ export default function CameraDetailPage() {
   const [error, setError] = useState("");
   const [mounted, setMounted] = useState(false);
   const [fullscreenImage, setFullscreenImage] = useState(null);
+  const [captureError, setCaptureError] = useState("");
+  const [streamError, setStreamError] = useState(false);
+  const [streamRetryNonce, setStreamRetryNonce] = useState(0);
+  const [streamCandidateIndex, setStreamCandidateIndex] = useState(0);
+  const captureIntervalRef = useRef(null);
+  const streamImgRef = useRef(null);
+  const canvasRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useEffect(() => {
+    setStreamError(false);
+    setStreamRetryNonce(0);
+    setStreamCandidateIndex(0);
+  }, [camera?.esp32StreamUrl]);
+
+  useEffect(() => {
+    const candidates = buildStreamCandidates(camera);
+    if (!streamError || candidates.length === 0) return;
+
+    const retryTimer = setTimeout(() => {
+      setStreamRetryNonce((prev) => prev + 1);
+      setStreamCandidateIndex((prev) => (prev + 1) % candidates.length);
+      setStreamError(false);
+    }, 5000);
+
+    return () => clearTimeout(retryTimer);
+  }, [streamError, camera?.esp32StreamUrl, camera?.esp32?.ipAddress]);
 
   const loadData = useCallback(
     async (user) => {
@@ -86,14 +143,14 @@ export default function CameraDetailPage() {
           }),
         ]);
 
+        if (!cameraResponse.ok || !incidentResponse.ok) {
+          throw new Error(`Failed to fetch data: cameras=${cameraResponse.status} incidents=${incidentResponse.status}`);
+        }
+
         const [cameraData, incidentData] = await Promise.all([
           cameraResponse.json(),
           incidentResponse.json(),
         ]);
-
-        if (!cameraResponse.ok || !incidentResponse.ok) {
-          throw new Error("Failed to fetch camera data");
-        }
 
         const cameras = Array.isArray(cameraData)
           ? cameraData.map((c) => ({
@@ -141,6 +198,137 @@ export default function CameraDetailPage() {
     [cameraId]
   );
 
+  const hasEsp32Source = Boolean(
+    camera?.esp32CaptureUrl || camera?.esp32StreamUrl || camera?.esp32?.ipAddress
+  );
+
+  const captureFromStream = useCallback(async () => {
+    if (!streamImgRef.current || !canvasRef.current || !auth.currentUser || !cameraId) return;
+
+    const imageEl = streamImgRef.current;
+    const canvasEl = canvasRef.current;
+
+    if (!imageEl.complete || imageEl.naturalWidth === 0 || imageEl.naturalHeight === 0) {
+      setCaptureError("Stream frame not ready yet");
+      return;
+    }
+
+    canvasEl.width = imageEl.naturalWidth;
+    canvasEl.height = imageEl.naturalHeight;
+
+    const context = canvasEl.getContext("2d");
+    if (!context) {
+      setCaptureError("Unable to read stream frame");
+      return;
+    }
+
+    try {
+      context.drawImage(imageEl, 0, 0, canvasEl.width, canvasEl.height);
+    } catch (drawErr) {
+      setCaptureError(`Stream capture failed: ${drawErr.message}`);
+      return;
+    }
+
+    try {
+      const token = await auth.currentUser.getIdToken(true);
+
+      const imageBlob = await new Promise((resolve, reject) => {
+        canvasEl.toBlob(
+          (blob) => {
+            if (!blob) {
+              reject(new Error("Failed to create image blob from stream"));
+              return;
+            }
+            resolve(blob);
+          },
+          "image/jpeg",
+          0.9
+        );
+      });
+
+      const formData = new FormData();
+      formData.append("image", imageBlob, "capture.jpg");
+      formData.append("cameraId", cameraId);
+      formData.append(
+        "location",
+        JSON.stringify({
+          cameraId,
+          lat: camera?.latitude,
+          lng: camera?.longitude,
+        })
+      );
+
+      const detectResponse = await fetch(`${API_URL}/api/detect/image`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: formData,
+      });
+
+      if (!detectResponse.ok) {
+        let errorMessage = "Capture detection failed";
+        try {
+          const errorPayload = await detectResponse.json();
+          errorMessage = errorPayload?.message || errorMessage;
+          if (errorPayload?.detail) {
+            errorMessage = `${errorMessage}: ${errorPayload.detail}`;
+          }
+          if (Array.isArray(errorPayload?.attemptedUrls) && errorPayload.attemptedUrls.length) {
+            errorMessage = `${errorMessage} (tried: ${errorPayload.attemptedUrls.join(", ")})`;
+          }
+        } catch {
+          // keep default message when response is not JSON
+        }
+        setCaptureError(errorMessage);
+        console.warn("Capture detection failed", {
+          status: detectResponse.status,
+          statusText: detectResponse.statusText,
+        });
+        return;
+      }
+
+      const detectionResult = await detectResponse.json();
+      const incidentData = detectionResult?.data;
+
+      if (incidentData?.imageUrl) {
+        setCaptureError(
+          incidentData.ai_error
+            ? `AI warning: ${incidentData.ai_error}${incidentData.capture_url ? ` (capture: ${incidentData.capture_url})` : ""}`
+            : ""
+        );
+      } else {
+        setCaptureError("Capture response did not include an image frame");
+      }
+    } catch (err) {
+      setCaptureError(`Capture error: ${err.message}`);
+      console.error("Frame capture/detection error:", err.message);
+    }
+  }, [camera, cameraId]);
+
+  useEffect(() => {
+    if (!hasEsp32Source || !mounted) {
+      if (captureIntervalRef.current) {
+        clearInterval(captureIntervalRef.current);
+      }
+      return;
+    }
+
+    // Initial capture
+    captureFromStream();
+
+    // Capture every 10 seconds from the rendered live stream
+    captureIntervalRef.current = setInterval(() => {
+      captureFromStream();
+    }, 10000);
+
+    return () => {
+      if (captureIntervalRef.current) {
+        clearInterval(captureIntervalRef.current);
+      }
+    };
+  }, [hasEsp32Source, mounted, captureFromStream]);
+
   useEffect(() => {
     if (checkedRef.current || !mounted) return;
     checkedRef.current = true;
@@ -161,10 +349,10 @@ export default function CameraDetailPage() {
 
       await loadData(user);
 
-      // Refresh less aggressively to lower Firestore read pressure.
+      // Refresh every 2 minutes to match backend cache TTL and minimize Firestore reads.
       intervalId = setInterval(() => {
         loadData(user);
-      }, 30000);
+      }, 120000);
     });
 
     return () => {
@@ -173,7 +361,14 @@ export default function CameraDetailPage() {
     };
   }, [router, loadData, mounted]);
 
-  const latestIncident = incidents[0] || null;
+  const streamCandidates = buildStreamCandidates(camera);
+  const activeStreamBase = streamCandidates.length
+    ? streamCandidates[streamCandidateIndex % streamCandidates.length]
+    : null;
+  const streamSrc = activeStreamBase
+    ? `${activeStreamBase}${activeStreamBase.includes("?") ? "&" : "?"}t=${streamRetryNonce}`
+    : null;
+  const dbFrames = incidents.slice(0, 12);
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
@@ -250,79 +445,67 @@ export default function CameraDetailPage() {
                 <div className="grid gap-6 lg:grid-cols-3">
                   {/* Live Feed */}
                   <div className="lg:col-span-2 space-y-6">
-                    {/* Primary Image */}
+                    {/* ESP32 Stream or Incident Image */}
                     <div className="app-card overflow-hidden rounded-2xl bg-slate-900">
                       <div className="relative">
-                        {latestIncident?.imageUrl ? (
+                        {streamSrc && !streamError ? (
+                          /* ESP32 MJPEG Stream */
                           <div className="relative group">
                             <img
-                              src={latestIncident.imageUrl}
-                              alt="Live feed"
+                              src={streamSrc}
+                              alt="ESP32 Live Stream"
+                              ref={streamImgRef}
+                              crossOrigin="anonymous"
                               className="h-[500px] w-full object-cover"
+                              style={invertedPreviewStyle}
+                              onLoad={() => {
+                                setStreamError(false);
+                              }}
+                              onError={() => {
+                                setStreamError(true);
+                              }}
                             />
-                            <button
-                              onClick={() => setFullscreenImage(latestIncident.imageUrl)}
-                              className="absolute top-4 right-4 bg-black/60 hover:bg-black/80 text-white p-2 rounded-lg transition opacity-0 group-hover:opacity-100"
-                            >
-                              <Maximize className="h-5 w-5" />
-                            </button>
                             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black to-transparent p-4">
                               <div className="flex items-center gap-2 text-white">
-                                <Signal className="h-4 w-4 text-green-400" />
-                                <span className="text-sm font-medium">Live Stream</span>
+                                <Signal className="h-4 w-4 text-green-400 animate-pulse" />
+                                <span className="text-sm font-medium">ESP32 Live Stream</span>
                               </div>
-                              <p className="text-xs text-gray-300 mt-2">{formatDateTime(latestIncident.createdAt || latestIncident.updatedAt)}</p>
+                              {streamCandidates.length > 1 && (
+                                <p className="text-[11px] text-gray-300 mt-1">
+                                  Source {streamCandidateIndex + 1}/{streamCandidates.length}
+                                </p>
+                              )}
+                              <p className="text-xs text-gray-300 mt-2">Real-time video from device</p>
                             </div>
                           </div>
                         ) : (
+                          /* No Stream or Images Available */
                           <div className="h-[500px] flex flex-col items-center justify-center text-center">
                             <ImageIcon className="h-16 w-16 text-slate-600 mb-4" />
-                            <h3 className="text-xl font-semibold text-white">No Live Image Yet</h3>
+                            <h3 className="text-xl font-semibold text-white">No Live Stream Available</h3>
                             <p className="text-slate-400 mt-2 max-w-sm">
-                              This camera will display the latest incident image here as soon as new activity is detected.
+                              {camera?.esp32StreamUrl ?
+                                "ESP32 stream URL configured but not responding. Check ESP32 network and endpoint." :
+                                "ESP32 not configured yet. Ask field operator to set up device."}
                             </p>
+                            {streamSrc && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setStreamRetryNonce((prev) => prev + 1);
+                                  setStreamCandidateIndex((prev) => (prev + 1) % Math.max(streamCandidates.length, 1));
+                                  setStreamError(false);
+                                }}
+                                className="mt-4 inline-flex items-center rounded-md border border-slate-500 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800"
+                              >
+                                Retry Live Stream
+                              </button>
+                            )}
                           </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Incident Details */}
-                    {latestIncident && (
-                      <div className="app-card p-6 border border-slate-200">
-                        <h3 className="font-semibold text-lg text-slate-900 mb-4">Latest Incident Details</h3>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                          <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                            <p className="text-xs font-semibold text-slate-500 uppercase">Crime Type</p>
-                            <p className="text-sm font-semibold text-slate-900 mt-2">
-                              {latestIncident.crime_type?.replace(/_/g, " ") || "Unknown"}
-                            </p>
-                          </div>
-                          <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                            <p className="text-xs font-semibold text-slate-500 uppercase">Threat Level</p>
-                            <p className={`text-sm font-semibold mt-2 ${
-                              latestIncident.threat_level === "CRITICAL" ? "text-red-600" :
-                              latestIncident.threat_level === "HIGH" ? "text-orange-600" :
-                              latestIncident.threat_level === "MEDIUM" ? "text-yellow-600" :
-                              "text-green-600"
-                            }`}>
-                              {latestIncident.threat_level || "Unknown"}
-                            </p>
-                          </div>
-                          <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                            <p className="text-xs font-semibold text-slate-500 uppercase">Confidence</p>
-                            <p className="text-sm font-semibold text-slate-900 mt-2">
-                              {latestIncident.confidence ? `${Math.round(latestIncident.confidence * 100)}%` : "N/A"}
-                            </p>
-                          </div>
-                          <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                            <p className="text-xs font-semibold text-slate-500 uppercase">People Detected</p>
-                            <p className="text-sm font-semibold text-slate-900 mt-2">
-                              {latestIncident.persons_detected || 0}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   {/* Sidebar */}
@@ -365,6 +548,36 @@ export default function CameraDetailPage() {
                       </div>
                     </div>
 
+                    {/* ESP32 Configuration */}
+                    {camera?.esp32?.configured && (
+                      <div className="app-card p-6 border border-cyan-200 bg-cyan-50">
+                        <h3 className="font-semibold text-lg text-cyan-900 mb-4 flex items-center gap-2">
+                          <Wifi className="h-5 w-5" />
+                          ESP32 Device
+                        </h3>
+                        <div className="space-y-3 text-sm">
+                          <div>
+                            <p className="text-xs font-semibold text-cyan-700 uppercase">IP Address</p>
+                            <p className="text-cyan-900 mt-1 font-mono">{camera.esp32?.ipAddress || "-"}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-cyan-700 uppercase">Last Seen</p>
+                            <p className="text-cyan-900 mt-1">
+                              {camera.esp32?.lastSeenAt ? formatDateTime(camera.esp32.lastSeenAt) : "Never"}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-cyan-700 uppercase">Stream Status</p>
+                            <p className={`text-sm font-semibold mt-1 ${
+                              camera.esp32StreamUrl ? "text-green-600" : "text-amber-600"
+                            }`}>
+                              {camera.esp32StreamUrl ? "✓ Configured" : "✗ Not Available"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Activity Summary */}
                     <div className="app-card p-6 border border-slate-200">
                       <h3 className="font-semibold text-lg text-slate-900 mb-4 flex items-center gap-2">
@@ -399,48 +612,45 @@ export default function CameraDetailPage() {
                   </div>
                 </div>
 
-                {/* Recent Incidents */}
-                <div className="app-card p-6 border border-slate-200">
-                  <h3 className="font-semibold text-lg text-slate-900 mb-4 flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Recent Incident Images
-                  </h3>
-                  {incidents.length === 0 ? (
-                    <div className="text-center py-12">
-                      <ImageIcon className="h-12 w-12 text-slate-400 mx-auto mb-3 opacity-40" />
-                      <p className="text-slate-600">No incident images available yet.</p>
+                {/* Captured Frames with AI Detection */}
+                {hasEsp32Source && (
+                  <div className="app-card p-6 border border-slate-200">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold text-lg text-slate-900 flex items-center gap-2">
+                        <Camera className="h-5 w-5" />
+                        Captured Images (Database)
+                      </h3>
                     </div>
-                  ) : (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                      {incidents.slice(0, 12).map((incident) => (
-                        <div key={incident.id} className="group relative overflow-hidden rounded-lg border border-slate-200 hover:border-blue-400 transition cursor-pointer"
-                          onClick={() => setFullscreenImage(incident.imageUrl)}
-                        >
-                          {incident.imageUrl && (
-                            <>
-                              <img
-                                src={incident.imageUrl}
-                                alt="Incident"
-                                className="h-32 w-full object-cover group-hover:scale-110 transition duration-300"
-                              />
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition flex items-center justify-center">
-                                <Maximize className="h-6 w-6 text-white opacity-0 group-hover:opacity-100 transition" />
-                              </div>
-                            </>
-                          )}
-                          <div className="p-2 bg-white">
-                            <p className="text-xs font-semibold text-slate-900 truncate">
-                              {incident.crime_type?.replace(/_/g, " ") || "Incident"}
-                            </p>
-                            <p className="text-xs text-slate-500 mt-1">
-                              {formatDateTime(incident.createdAt || incident.updatedAt)}
-                            </p>
+                    <p className="text-xs text-slate-500 mb-4">Showing images stored in database (refreshes every 2 minutes). Live stream is prioritized when available.</p>
+
+                    {dbFrames.length === 0 ? (
+                      <p className="text-gray-500">No database images available yet.</p>
+                    ) : (
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        {dbFrames.map((frame, idx) => (
+                          <div key={frame.id || idx} className="border rounded-lg overflow-hidden cursor-pointer" onClick={() => setFullscreenImage(frame.imageUrl)}>
+                            <img
+                              src={frame.imageUrl}
+                              alt="Captured"
+                              className="w-full h-40 object-cover"
+                              style={invertedPreviewStyle}
+                            />
+
+                            <div className="p-2">
+                              <p className="text-xs font-semibold">{frame.crime_type?.replace(/_/g, " ") || "UNKNOWN"}</p>
+                              <p className="text-xs text-gray-500">{formatDateTime(frame.createdAt || frame.updatedAt)}</p>
+                              <p className="text-xs">Confidence: {Math.round((Number(frame.confidence) || 0) * 100)}%</p>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+                        ))}
+                      </div>
+                    )}
+                    {captureError && (
+                      <p className="text-xs text-red-600 mt-3">{captureError}</p>
+                    )}
+                    <canvas ref={canvasRef} style={{ display: "none" }} />
+                  </div>
+                )}
               </div>
             </div>
           )}

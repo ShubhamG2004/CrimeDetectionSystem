@@ -301,10 +301,10 @@ export default function OperatorIncidentsPage() {
 
       await fetchAlerts(user);
 
-      // Refresh less aggressively to reduce backend Firestore reads.
+      // Refresh every 2 minutes to match backend cache TTL and minimize Firestore reads.
       intervalId = setInterval(() => {
         fetchAlerts(user);
-      }, 30000);
+      }, 120000);
     });
 
     return () => {
