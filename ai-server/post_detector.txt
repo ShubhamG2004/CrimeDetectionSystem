@@ -31,32 +31,21 @@ def _is_portrait_or_headshot(kps: np.ndarray, conf=None) -> bool:
     # right_knee=14, left_ankle=15, right_ankle=16
     lower_body_idx = [11, 12, 13, 14, 15, 16]
 
-    lower_conf_missing = False
     if conf is not None:
         lower_confs = [float(conf[i]) for i in lower_body_idx if i < len(conf)]
-        lower_conf_missing = bool(lower_confs) and max(lower_confs) < 0.12
+        if lower_confs and max(lower_confs) < 0.15:
+            return True  # no lower body visible at all
 
     # Check if hip positions are essentially (0,0) = not detected
     lh, rh = kps[11], kps[12]
-    hips_missing = (lh[0] < 2 and lh[1] < 2) and (rh[0] < 2 and rh[1] < 2)
+    if (lh[0] < 2 and lh[1] < 2) or (rh[0] < 2 and rh[1] < 2):
+        return True
 
     # Check torso height — too small = partial body / portrait
     nose = kps[0]
     hip_mid_y = (lh[1] + rh[1]) / 2
     torso_h = abs(nose[1] - hip_mid_y)
-    very_small_torso = torso_h < 35
-
-    # Require at least two portrait cues to avoid filtering distant but valid
-    # full-body detections from street CCTV viewpoints.
-    portrait_votes = 0
-    if lower_conf_missing:
-        portrait_votes += 1
-    if hips_missing:
-        portrait_votes += 1
-    if very_small_torso:
-        portrait_votes += 1
-
-    if portrait_votes >= 2:
+    if torso_h < 35:
         return True
 
     return False
@@ -201,8 +190,7 @@ class PoseCrimeDetector:
             return s, acts
 
         # Keypoint quality gate
-        # Distant/angled CCTV subjects may have sparse but still meaningful poses.
-        min_conf, min_pts = 0.25, 5
+        min_conf, min_pts = 0.35, 7
         if conf is not None and int(np.sum(conf > min_conf)) < min_pts:
             return s, acts
 
@@ -217,8 +205,8 @@ class PoseCrimeDetector:
         torso_h = abs(nose[1] - (lh[1] + rh[1]) / 2)
         sh_width = abs(ls[0] - rs[0])
 
-        # Keep portrait suppression while allowing small-but-valid distant bodies.
-        if torso_h < 24 or sh_width < 12:
+        # FIX 1: Hard size minimums — portrait frames have tiny torso height
+        if torso_h < 40 or sh_width < 20:
             return s, acts
 
         # FIX 2: Food-prep context — suppress knife/stabbing signals
@@ -257,21 +245,11 @@ class PoseCrimeDetector:
                 s.append(sig)
                 acts.append("SHOOTING_THREAT")
 
-        # Gun holding (tightened): avoid false positives from normal hands-near-hip
-        # postures like carrying objects or relaxed standing.
-        if not self._is_crouching(k):
-            for wrist, elbow, shoulder, hip, sig in [
-                (lw, le, ls, lh, "GUN_HOLDING_LEFT"),
-                (rw, re, rs, rh, "GUN_HOLDING_RIGHT"),
-            ]:
-                close_to_hip = self._distance(wrist, hip) < torso_h * 0.32
-                lateral_compact = abs(wrist[0] - hip[0]) < torso_h * 0.28
-                vertical_band = (hip[1] - torso_h * 0.28) < wrist[1] < (hip[1] + torso_h * 0.12)
-                bent_arm = self._distance(wrist, elbow) < self._distance(shoulder, elbow) * 1.05
-
-                if close_to_hip and lateral_compact and vertical_band and bent_arm:
-                    s.append(sig)
-                    acts.append("ARMED_THREAT")
+        # Gun holding
+        for wrist, hip, sig in [(lw, lh, "GUN_HOLDING_LEFT"), (rw, rh, "GUN_HOLDING_RIGHT")]:
+            if self._distance(wrist, hip) < torso_h * 0.55:
+                s.append(sig)
+                acts.append("ARMED_THREAT")
 
         # FIX 2: Knife / stabbing — skip in food-prep context
         if not is_food_prep:
@@ -512,9 +490,9 @@ class PoseCrimeDetector:
             "WEAPON_THREAT_RIGHT": 25, "GUN_AIMING_LEFT": 55, "GUN_AIMING_RIGHT": 55,
             "GUN_HOLDING_LEFT": 45, "GUN_HOLDING_RIGHT": 45, "KNIFE_WIELDING_LEFT": 42,
             "KNIFE_WIELDING_RIGHT": 42, "STABBING_MOTION_LEFT": 48, "STABBING_MOTION_RIGHT": 48,
-            "ASSAULT_HEAD": 35, "DIRECT_ASSAULT": 40, "GRABBING": 10, "RESTRAINING_HOLD": 40,
+            "ASSAULT_HEAD": 35, "DIRECT_ASSAULT": 40, "GRABBING": 25, "RESTRAINING_HOLD": 40,
             "PUNCH_LEFT": 20, "PUNCH_RIGHT": 20, "KICK_LEFT": 20, "KICK_RIGHT": 20,
-            "FALLEN": 15, "CLOSE_CONTACT": 5, "BODY_COLLISION": 15, "POWER_IMBALANCE": 25,
+            "FALLEN": 15, "CLOSE_CONTACT": 15, "BODY_COLLISION": 30, "POWER_IMBALANCE": 25,
             "VULNERABLE_POSITION": 30, "DOMINANT_OVER_FALLEN": 48, "SHOULDER_CONTROL": 28,
             "ARM_LOCK": 32,
         }
@@ -564,7 +542,7 @@ class PoseCrimeDetector:
         if ("KNIFE_WIELDING_LEFT" in s or "KNIFE_WIELDING_RIGHT" in s
                 or "STABBING_MOTION_LEFT" in s or "STABBING_MOTION_RIGHT" in s):
             return "Armed Assault / Stabbing", "CRITICAL"
-        if "DIRECT_ASSAULT" in s and persons <= 4:
+        if "DIRECT_ASSAULT" in s:
             return "Physical Assault", "HIGH"
         if persons >= 3 and ("PHYSICAL_ASSAULT" in a or "CROWD_FORMATION" in a):
             return "Crowd Violence", "HIGH"
@@ -676,10 +654,8 @@ def layer1_ingest(image: np.ndarray) -> Tuple[Optional[np.ndarray], Optional[str
 #  L2 — Pose detection
 # ─────────────────────────────────────────────────────────────────────────────
 
-# CCTV street frames often have partial keypoints; keep this permissive enough
-# to avoid suppressing valid violence cues from distant subjects.
-MIN_KP_CONF = 0.25
-MIN_VALID_KP = 5
+MIN_KP_CONF = 0.35
+MIN_VALID_KP = 7
 
 def _is_bird_eye(boxes: Optional[np.ndarray]) -> bool:
     """Detect bird's eye view based on bounding box aspect ratios"""
@@ -728,7 +704,6 @@ def layer2_pose(image: np.ndarray, model) -> Tuple[Optional[dict], Optional[str]
         "kps_all": kps_all,
         "conf_all": conf_all,
         "boxes": boxes,
-        "image_shape": image.shape[:2],
         "valid_idx": valid_idx,
         "raw_persons": len(kps_all),
         "persons": max(len(kps_all), len(boxes) if boxes is not None else 0),
@@ -792,41 +767,6 @@ MULTI_PERSON_ONLY_ACTIVITIES = {
     "STABBING_ATTACK", "WEAPON_THREAT", "ARMED_THREAT", "SHOOTING_THREAT",
 }
 
-GROUP_SCENE_NOISE_SIGNALS = {
-    "CLOSE_CONTACT",
-    "BODY_COLLISION",
-    "ASSAULT_HEAD",
-    "GRABBING",
-    "RESTRAINING_HOLD",
-    "POWER_IMBALANCE",
-    "VULNERABLE_POSITION",
-}
-
-GROUP_SCENE_NOISE_ACTIVITIES = {
-    "PHYSICAL_PROXIMITY",
-    "PHYSICAL_CONTACT",
-    "PHYSICAL_CONTROL",
-    "RESTRAINING_MOTION",
-    "RESTRAINT_ATTEMPT",
-    "FOLLOWING_CHASING",
-    "KICKING_MOTION",
-    "PHYSICAL_ASSAULT",
-    "CHOKING_MOTION",
-    "STABBING_ATTACK",
-    "ARMED_THREAT",
-    "SHOOTING_THREAT",
-}
-
-GROUP_SCENE_HARD_EVIDENCE = {
-    "FALLEN",
-    "DOMINANT_OVER_FALLEN",
-    "GUN_AIMING_LEFT",
-    "GUN_AIMING_RIGHT",
-    "GRAB_NECK_LEFT",
-    "GRAB_NECK_RIGHT",
-    "DIRECT_ASSAULT",
-}
-
 def layer4_extract_signals(pose_data: dict, detector: PoseCrimeDetector) -> Tuple[List[str], List[str]]:
     """
     Extract crime signals from pose data
@@ -841,9 +781,7 @@ def layer4_extract_signals(pose_data: dict, detector: PoseCrimeDetector) -> Tupl
     kps_all = pose_data["kps_all"]
     conf_all = pose_data["conf_all"]
     boxes = pose_data["boxes"]
-    image_shape = pose_data.get("image_shape", (0, 0))
     vi = pose_data["valid_idx"]
-    persons_estimate = int(pose_data.get("persons", 0) or 0)
 
     signals, activities, person_signals = [], [], []
 
@@ -862,59 +800,14 @@ def layer4_extract_signals(pose_data: dict, detector: PoseCrimeDetector) -> Tupl
         signals.extend(is_)
         activities.extend(ia)
 
-    # CRITICAL FIX (restricted): only force fallen/overlap cues for likely
-    # single-person under-detection cases. Avoid injecting these in clear
-    # multi-person scenes where they become false positives.
-    if boxes is not None and len(boxes) >= 1 and persons_estimate <= 1:
+    # FIX 3: Check bbox aspect ratios for lying-down detection even with 1 person
+    if boxes is not None and len(boxes) >= 1:
         lying_count = sum(1 for b in boxes if _bbox_is_lying_down(b))
-
-        if lying_count >= 1:
-            signals.append("FALLEN")
-            activities.append("PRONE_POSITION")
-
-        # If a person box is much wider than tall, treat as possible overlapping
-        # attacker-victim scene and inject dominant-assault cues.
-        for b in boxes:
-            x1, y1, x2, y2 = b
-            w = x2 - x1
-            h = y2 - y1
-
-            if h > 0 and w > h * 1.45:
+        standing_count = len(boxes) - lying_count
+        if lying_count >= 1 and standing_count >= 1:
+            if "DOMINANT_OVER_FALLEN" not in signals:
                 signals.append("DOMINANT_OVER_FALLEN")
                 activities.append("PHYSICAL_ASSAULT")
-
-    # Additional fallback: overlap assaults can appear as large near-ground boxes
-    # that are not wide enough to pass strict lying-aspect checks.
-    frame_h, frame_w = image_shape if image_shape is not None else (0, 0)
-    if boxes is not None and len(boxes) >= 1 and frame_h > 0 and frame_w > 0 and persons_estimate <= 1:
-        for b in boxes:
-            x1, y1, x2, y2 = b
-            w = max(0.0, x2 - x1)
-            h = max(0.0, y2 - y1)
-            if h <= 0:
-                continue
-
-            aspect = w / h
-            area_ratio = (w * h) / max(1.0, float(frame_w * frame_h))
-            bottom_ratio = y2 / max(1.0, float(frame_h))
-
-            # Likely person-down posture near road/ground plane.
-            if area_ratio >= 0.28 and bottom_ratio >= 0.78 and aspect >= 1.1:
-                signals.append("FALLEN")
-                activities.append("PRONE_POSITION")
-
-            # Likely overlap dominance (attacker over victim) in single-box cases.
-            if area_ratio >= 0.34 and bottom_ratio >= 0.80 and aspect >= 1.25:
-                signals.append("DOMINANT_OVER_FALLEN")
-                activities.append("PHYSICAL_ASSAULT")
-
-    # Large posed groups often trigger false interaction cues because hands, faces,
-    # and shoulders overlap in a tight cluster. If we have many people but no hard
-    # assault evidence, strip the noisy crowd-only cues before scoring.
-    has_hard_evidence = bool(set(signals) & GROUP_SCENE_HARD_EVIDENCE)
-    if persons_estimate >= 5 and not has_hard_evidence:
-        signals = [s for s in signals if s not in GROUP_SCENE_NOISE_SIGNALS]
-        activities = [a for a in activities if a not in GROUP_SCENE_NOISE_ACTIVITIES]
 
     return signals, activities
 
@@ -981,11 +874,6 @@ def layer5_contextual_filter(signals: List[str], activities: List[str], persons:
                       "GUN_HOLDING_LEFT", "GUN_HOLDING_RIGHT"}):
             aa -= {"ARMED_THREAT", "SHOOTING_THREAT"}
 
-    # CRITICAL FIX: Do not let contextual filtering remove key downed-victim cues.
-    critical_signals = {"FALLEN", "DOMINANT_OVER_FALLEN"}
-    if any(sig in signals for sig in critical_signals):
-        return signals, activities
-
     return list(ss), list(aa)
 
 
@@ -1037,11 +925,11 @@ class TemporalValidator:
 
 SIGNAL_WEIGHTS = {
     "GRAB_NECK_LEFT": 32, "GRAB_NECK_RIGHT": 32, "ASSAULT_HEAD": 38, "DIRECT_ASSAULT": 45,
-    "BODY_COLLISION": 15, "CLOSE_CONTACT": 5, "PUNCH_LEFT": 22, "PUNCH_RIGHT": 22,
-    "KICK_LEFT": 22, "KICK_RIGHT": 22, "FALLEN": 18, "GRABBING": 10, "POWER_IMBALANCE": 28,
+    "BODY_COLLISION": 32, "CLOSE_CONTACT": 18, "PUNCH_LEFT": 22, "PUNCH_RIGHT": 22,
+    "KICK_LEFT": 22, "KICK_RIGHT": 22, "FALLEN": 18, "GRABBING": 28, "POWER_IMBALANCE": 28,
     "VULNERABLE_POSITION": 32, "RESTRAINING_HOLD": 42, "DOMINANT_OVER_FALLEN": 52,
     "SHOULDER_CONTROL": 30, "ARM_LOCK": 35, "WEAPON_THREAT_LEFT": 28, "WEAPON_THREAT_RIGHT": 28,
-    "GUN_HOLDING_LEFT": 20, "GUN_HOLDING_RIGHT": 20, "GUN_AIMING_LEFT": 60, "GUN_AIMING_RIGHT": 60,
+    "GUN_HOLDING_LEFT": 50, "GUN_HOLDING_RIGHT": 50, "GUN_AIMING_LEFT": 60, "GUN_AIMING_RIGHT": 60,
     "KNIFE_WIELDING_LEFT": 45, "KNIFE_WIELDING_RIGHT": 45,
     "STABBING_MOTION_LEFT": 52, "STABBING_MOTION_RIGHT": 52,
 }
@@ -1112,54 +1000,10 @@ def layer7_score(signals: List[str], activities: List[str], persons: int,
     if "GRAB_NECK_LEFT" in ss or "GRAB_NECK_RIGHT" in ss:
         score += 28
 
-    strong_signals = {
-        "DIRECT_ASSAULT",
-        "ASSAULT_HEAD",
-        "BODY_COLLISION",
-        "DOMINANT_OVER_FALLEN",
-        "GRAB_NECK_LEFT",
-        "GRAB_NECK_RIGHT",
-        "GUN_AIMING_LEFT",
-        "GUN_AIMING_RIGHT",
-        "RESTRAINING_HOLD",
-    }
-    strong_activities = {
-        "PHYSICAL_ASSAULT",
-        "STABBING_ATTACK",
-        "SHOOTING_THREAT",
-        "CHOKING_MOTION",
-        "RESTRAINT_ATTEMPT",
-    }
-    has_strong_evidence = bool(ss & strong_signals) or bool(aa & strong_activities) or bool(weapons)
-
-    # Damp noisy high scores when only weak cues are present.
-    if not has_strong_evidence:
-        score *= 0.55
-
     # Single person with weapon but no aggression
     if persons == 1 and not weapons:
         if ss & {"GUN_HOLDING_LEFT", "GUN_HOLDING_RIGHT", "WEAPON_THREAT_LEFT", "WEAPON_THREAT_RIGHT"}:
-            score = max(score, 24)
-
-    # Accuracy guard: single-person/no-weapon frames with only gun-holding-like
-    # cues should remain below alert threshold unless stronger evidence appears.
-    non_critical_signals = {
-        "GUN_HOLDING_LEFT",
-        "GUN_HOLDING_RIGHT",
-    }
-    non_critical_activities = {
-        "CROUCHING",
-        "RUNNING",
-        "HANDS_UP",
-    }
-    has_gun_holding_only = bool(ss & non_critical_signals) and ss.issubset(non_critical_signals)
-    has_no_strong_activity = (len(aa) == 0) or aa.issubset(non_critical_activities)
-    if persons == 1 and not weapons and has_gun_holding_only and has_no_strong_activity:
-        score = min(score, 24)
-
-    # CRITICAL FIX: enforce a minimum score for downed-victim scenes.
-    if "FALLEN" in ss or "DOMINANT_OVER_FALLEN" in ss:
-        score = max(score, 65)
+            score = max(score, 32)
 
     return min(100.0, max(0.0, score))
 
@@ -1197,22 +1041,6 @@ def layer8_gate(threat_score: float, crime_type: str, threat_level: str,
         fl = "MEDIUM"
     else:
         fl = "LOW"
-
-    critical_evidence = {
-        "GUN_AIMING_LEFT",
-        "GUN_AIMING_RIGHT",
-        "DOMINANT_OVER_FALLEN",
-        "DIRECT_ASSAULT",
-        "ASSAULT_HEAD",
-        "GRAB_NECK_LEFT",
-        "GRAB_NECK_RIGHT",
-        "RESTRAINING_HOLD",
-    }
-
-    # Do not label as HIGH/CRITICAL only from inflated score when hard evidence
-    # is missing and no weapon is detected.
-    if fl in {"HIGH", "CRITICAL"} and not (ss & critical_evidence) and not weapons:
-        fl = "MEDIUM" if threat_score >= 30 else "LOW"
 
     # Hard CRITICAL overrides
     if "GUN_AIMING_LEFT" in ss or "GUN_AIMING_RIGHT" in ss:
@@ -1309,33 +1137,8 @@ class MultiLayerValidator:
             signals, activities, persons, weapons, location
         )
 
-        # Preserve current-frame evidence so temporal smoothing cannot erase
-        # critical one-frame assault cues in still-image uploads.
-        raw_signals = list(signals)
-
         self.temporal.update(signals)
-        temporal_signals = self.temporal.sustained_signals()
-
-        critical_one_frame_signals = {
-            "FALLEN",
-            "DOMINANT_OVER_FALLEN",
-            "GUN_AIMING_LEFT",
-            "GUN_AIMING_RIGHT",
-            "DIRECT_ASSAULT",
-            "GRAB_NECK_LEFT",
-            "GRAB_NECK_RIGHT",
-            "RESTRAINING_HOLD",
-        }
-
-        if temporal_signals:
-            merged = set(temporal_signals)
-        else:
-            # If temporal consensus is empty, use current-frame signals.
-            merged = set(raw_signals)
-
-        # Always keep critical current-frame cues even if not yet sustained.
-        merged |= (set(raw_signals) & critical_one_frame_signals)
-        signals = list(merged)
+        signals = self.temporal.sustained_signals()
 
         threat_score = layer7_score(signals, activities, persons, weapons, self.temporal)
         crime_type, _ = self.detector._classify(signals, activities, persons)

@@ -27,148 +27,10 @@ const parseJSON = (value) => {
 };
 
 /* --------------------------------------------------
-   🔢 Helper: Calculate Threat Score (0–100)
+   🧠 Decision Source of Truth
 -------------------------------------------------- */
-const calculateThreatScore = ({ confidence = 0, threat_level = "LOW" }) => {
-  let score = Math.round(confidence * 100);
-
-  switch (threat_level.toUpperCase()) {
-    case "CRITICAL":
-      score += 40;
-      break;
-    case "HIGH":
-      score += 25;
-      break;
-    case "MEDIUM":
-      score += 15;
-      break;
-    default:
-      break;
-  }
-
-  return Math.min(100, score);
-};
-
-/* --------------------------------------------------
-   🧠 Helper: Contextual Threat Filtering
--------------------------------------------------- */
-const THREAT_KEYWORDS = {
-  weaponSignals: ["GUN", "KNIFE", "STABBING", "WEAPON"],
-  violentActivities: ["PHYSICAL_ASSAULT", "SHOOTING_THREAT", "STABBING_ATTACK", "WEAPON_THREAT"],
-  suspiciousActivities: ["FOLLOWING_CHASING", "ARMED_THREAT"],
-};
-
-const LOCATION_FALSE_POSITIVE_KEYWORDS = ["MARKET", "FISH", "SEAFOOD"];
-
-const toUpperSafe = (value) => String(value || "").toUpperCase();
-
-const sanitizeSignals = (signals = []) => {
-  if (!Array.isArray(signals)) return [];
-  return signals
-    .filter(Boolean)
-    .filter((signal) => !toUpperSafe(signal).includes("SEXUAL ASSAULT"));
-};
-
-const includesKeyword = (items = [], keywords = []) => {
-  if (!Array.isArray(items) || !items.length || !keywords.length) return false;
-  const upperItems = items.map((item) => toUpperSafe(item));
-  return upperItems.some((item) => keywords.some((keyword) => item.includes(keyword)));
-};
-
-const evaluateThreatContext = ({
-  signals = [],
-  activities = [],
-  confidence = 0,
-  locationName = "",
-  persons = 0,
-}) => {
-  const sanitizedSignals = sanitizeSignals(signals);
-  const normalizedActivities = Array.isArray(activities)
-    ? activities.filter(Boolean)
-    : [];
-  const normalizedPersons = Number(persons) || 0;
-
-  const reasons = [];
-
-  const hasWeapon = includesKeyword(sanitizedSignals, THREAT_KEYWORDS.weaponSignals);
-  const hasViolentContext = includesKeyword(normalizedActivities, THREAT_KEYWORDS.violentActivities);
-  const hasSuspiciousContext = includesKeyword(
-    normalizedActivities,
-    THREAT_KEYWORDS.suspiciousActivities
-  );
-
-  const requiresMultiplePersons = hasWeapon || normalizedActivities.includes("STABBING_ATTACK");
-  const insufficientPersons = requiresMultiplePersons && normalizedPersons < 2;
-  if (insufficientPersons) {
-    reasons.push("single-person-context");
-  }
-
-  const stabbingWithoutAssault =
-    normalizedActivities.includes("STABBING_ATTACK") &&
-    !normalizedActivities.includes("PHYSICAL_ASSAULT");
-  if (stabbingWithoutAssault) {
-    reasons.push("stabbing-without-physical-assault");
-  }
-
-  if (!hasWeapon) {
-    reasons.push("no-weapon-detected");
-  }
-
-  if (hasWeapon && !hasViolentContext && !hasSuspiciousContext) {
-    reasons.push("weapon-without-context");
-  }
-
-  const lowConfidence = Number(confidence) < 0.95;
-  if (lowConfidence) {
-    reasons.push("confidence-below-0.95");
-  }
-
-  const locationLabel = toUpperSafe(locationName);
-  const filteredLocation = LOCATION_FALSE_POSITIVE_KEYWORDS.some((keyword) =>
-    locationLabel.includes(keyword)
-  );
-
-  if (filteredLocation) {
-    reasons.push("filtered-location");
-  }
-
-  const isRealThreat =
-    hasWeapon &&
-    (hasViolentContext || hasSuspiciousContext || normalizedActivities.includes("PHYSICAL_ASSAULT")) &&
-    !lowConfidence &&
-    !filteredLocation &&
-    !insufficientPersons &&
-    !stabbingWithoutAssault;
-
-  return {
-    isRealThreat,
-    sanitizedSignals,
-    normalizedActivities,
-    reasons: isRealThreat ? [] : reasons,
-  };
-};
-
-const stripSinglePersonMarkers = ({ signals = [], activities = [], persons = 0 }) => {
-  const normalizedPersons = Number(persons) || 0;
-  if (normalizedPersons >= 2) {
-    return { signals, activities };
-  }
-
-  const filteredSignals = signals.filter((signal) => {
-    const upper = toUpperSafe(signal);
-    return !upper.includes("SEXUAL") && !upper.includes("LOWER_BODY");
-  });
-
-  const filteredActivities = activities.filter((activity) => {
-    const upper = toUpperSafe(activity);
-    return !upper.includes("SEXUAL");
-  });
-
-  return {
-    signals: filteredSignals,
-    activities: filteredActivities,
-  };
-};
+// IMPORTANT: Crime decisions come from the Python AI server only.
+// Node.js is responsible for transport, persistence, and alert dispatch.
 
 /* --------------------------------------------------
    📥 IMAGE DETECTION ROUTE
@@ -275,6 +137,7 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
       type = "UNKNOWN",
       confidence = 0,
       threat_level = "LOW",
+      threat_score: aiThreatScore = 0,
       persons_detected = 0,
       activities = [],
       signals = [],
@@ -290,44 +153,19 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
     });
 
     const personsCount = Number(persons_detected) || 0;
-    const {
-      isRealThreat,
-      sanitizedSignals,
-      normalizedActivities,
-      reasons: suppressionReasons,
-    } = evaluateThreatContext({
-      signals,
-      activities,
-      confidence,
-      locationName: location.name,
-      persons: personsCount,
-    });
+    const finalSignals = Array.isArray(signals) ? signals : [];
+    const finalActivities = Array.isArray(activities) ? activities : [];
 
-    let finalSignals = sanitizedSignals;
-    let finalActivities = normalizedActivities;
+    // Trust AI outputs directly. Optional safety override only escalates when
+    // score is high but crime_detected is false.
+    const threat_score = Number.isFinite(Number(aiThreatScore)) ? Number(aiThreatScore) : 0;
+    let finalCrimeDetected = Boolean(aiCrimeDetected);
+    let finalCrimeType = type;
 
-    const singlePersonStripped = stripSinglePersonMarkers({
-      signals: finalSignals,
-      activities: finalActivities,
-      persons: personsCount,
-    });
-
-    finalSignals = singlePersonStripped.signals;
-    finalActivities = singlePersonStripped.activities;
-
-    const finalCrimeDetected = Boolean(aiCrimeDetected) && isRealThreat;
-
-    if (!isRealThreat) {
-      console.log("⚠️ Context filter suppressed alert", {
-        suppressionReasons,
-      });
+    if (!finalCrimeDetected && threat_score > 60) {
+      finalCrimeDetected = true;
+      finalCrimeType = "Suspicious Activity";
     }
-
-    /* ---------- THREAT SCORE ---------- */
-    const threat_score = calculateThreatScore({
-      confidence,
-      threat_level,
-    });
 
     /* ---------- CLOUDINARY UPLOAD ---------- */
     const imageBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString(
@@ -340,7 +178,7 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
 
     /* ---------- FIRESTORE SAVE ---------- */
     const incidentData = {
-      crime_type: type,
+      crime_type: finalCrimeType,
       confidence: Number(confidence) || 0,
 
       threat_level,
@@ -361,11 +199,6 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       aiTimestamp: timestamp,
-      contextFilter: {
-        suppressed: !isRealThreat,
-        reasons: suppressionReasons,
-        evaluatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
     };
 
     const docRef = await db.collection("incidents").add(incidentData);
@@ -404,7 +237,7 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
     }
 
     if (
-      isRealThreat &&
+      finalCrimeDetected &&
       shouldTriggerAlert({
         threat_level,
         threat_score,
@@ -423,8 +256,8 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
       } catch (alertErr) {
         console.error("Alert dispatch error:", alertErr.message);
       }
-    } else if (!isRealThreat) {
-      console.log("ℹ️ Incident stored but alert suppressed");
+    } else if (!finalCrimeDetected) {
+      console.log("ℹ️ Incident stored as non-crime by AI decision");
     }
 
     return res.status(201).json({
@@ -535,6 +368,7 @@ router.post("/esp32-image", upload.single("image"), async (req, res) => {
       type = "UNKNOWN",
       confidence = 0,
       threat_level = "LOW",
+      threat_score: aiThreatScore = 0,
       persons_detected = 0,
       activities = [],
       signals = [],
@@ -543,34 +377,19 @@ router.post("/esp32-image", upload.single("image"), async (req, res) => {
     } = aiRes.data || {};
 
     const personsCount = Number(persons_detected) || 0;
-    const {
-      isRealThreat,
-      sanitizedSignals,
-      normalizedActivities,
-      reasons: suppressionReasons,
-    } = evaluateThreatContext({
-      signals,
-      activities,
-      confidence,
-      locationName: location.name,
-      persons: personsCount,
-    });
+    const finalSignals = Array.isArray(signals) ? signals : [];
+    const finalActivities = Array.isArray(activities) ? activities : [];
 
-    let finalSignals = sanitizedSignals;
-    let finalActivities = normalizedActivities;
+    // Trust AI outputs directly. Optional safety override only escalates when
+    // score is high but crime_detected is false.
+    const threat_score = Number.isFinite(Number(aiThreatScore)) ? Number(aiThreatScore) : 0;
+    let finalCrimeDetected = Boolean(aiCrimeDetected);
+    let finalCrimeType = type;
 
-    const singlePersonStripped = stripSinglePersonMarkers({
-      signals: finalSignals,
-      activities: finalActivities,
-      persons: personsCount,
-    });
-
-    finalSignals = singlePersonStripped.signals;
-    finalActivities = singlePersonStripped.activities;
-
-    const finalCrimeDetected = Boolean(aiCrimeDetected) && isRealThreat;
-
-    const threat_score = calculateThreatScore({ confidence, threat_level });
+    if (!finalCrimeDetected && threat_score > 60) {
+      finalCrimeDetected = true;
+      finalCrimeType = "Suspicious Activity";
+    }
 
     const imageBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
     const uploadRes = await cloudinary.uploader.upload(imageBase64, {
@@ -578,7 +397,7 @@ router.post("/esp32-image", upload.single("image"), async (req, res) => {
     });
 
     const incidentData = {
-      crime_type: type,
+      crime_type: finalCrimeType,
       confidence: Number(confidence) || 0,
       threat_level,
       threat_score,
@@ -593,11 +412,6 @@ router.post("/esp32-image", upload.single("image"), async (req, res) => {
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
       aiTimestamp: timestamp,
-      contextFilter: {
-        suppressed: !isRealThreat,
-        reasons: suppressionReasons,
-        evaluatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      },
     };
 
     const docRef = await db.collection("incidents").add(incidentData);
@@ -633,7 +447,7 @@ router.post("/esp32-image", upload.single("image"), async (req, res) => {
     }
 
     if (
-      isRealThreat &&
+      finalCrimeDetected &&
       shouldTriggerAlert({
         threat_level,
         threat_score,

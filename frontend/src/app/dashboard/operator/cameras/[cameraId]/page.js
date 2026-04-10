@@ -54,6 +54,48 @@ const getCameraName = (camera) => camera?.cameraName || camera?.name || "Unnamed
 const getCameraLocation = (camera) => camera?.location || camera?.area || "Unknown location";
 const getCameraStatus = (camera) => String(camera?.status || "active").toLowerCase();
 
+const getCrimeTypeLabel = (value) => {
+  if (!value) return "Unknown Activity";
+
+  return String(value)
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+};
+
+const getThreatScore = (incident) => {
+  const explicitScore = Number(incident?.threat_score);
+  if (Number.isFinite(explicitScore) && explicitScore >= 0) {
+    return Math.max(0, Math.min(100, Math.round(explicitScore)));
+  }
+
+  const confidence = Number(incident?.confidence) || 0;
+  const level = String(incident?.threat_level || "LOW").toUpperCase();
+  const levelBoost = level === "CRITICAL" ? 20 : level === "HIGH" ? 14 : level === "MEDIUM" ? 8 : 2;
+
+  return Math.max(0, Math.min(100, Math.round(confidence * 100 + levelBoost)));
+};
+
+const getConfidencePercent = (value) =>
+  Math.max(0, Math.min(100, Math.round((Number(value) || 0) * 100)));
+
+const getThreatLevelClasses = (level) => {
+  const normalized = String(level || "LOW").toUpperCase();
+
+  if (normalized === "CRITICAL") {
+    return "bg-red-100 text-red-800 border-red-200";
+  }
+
+  if (normalized === "HIGH") {
+    return "bg-orange-100 text-orange-800 border-orange-200";
+  }
+
+  if (normalized === "MEDIUM") {
+    return "bg-yellow-100 text-yellow-800 border-yellow-200";
+  }
+
+  return "bg-emerald-100 text-emerald-800 border-emerald-200";
+};
+
 const normalizeHost = (value) => String(value || "").trim().replace(/^https?:\/\//i, "").replace(/\/+$/, "");
 
 const buildStreamCandidates = (camera) => {
@@ -349,10 +391,10 @@ export default function CameraDetailPage() {
 
       await loadData(user);
 
-      // Refresh every 2 minutes to match backend cache TTL and minimize Firestore reads.
+      // Refresh every 30 seconds so live monitoring details stay current.
       intervalId = setInterval(() => {
         loadData(user);
-      }, 120000);
+      }, 30000);
     });
 
     return () => {
@@ -369,6 +411,7 @@ export default function CameraDetailPage() {
     ? `${activeStreamBase}${activeStreamBase.includes("?") ? "&" : "?"}t=${streamRetryNonce}`
     : null;
   const dbFrames = incidents.slice(0, 12);
+  const latestIncident = incidents[0] || null;
 
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
@@ -504,6 +547,79 @@ export default function CameraDetailPage() {
                           </div>
                         )}
                       </div>
+                    </div>
+
+                    {/* Latest Detection Snapshot */}
+                    <div className="app-card border border-slate-200 p-5 sm:p-6">
+                      <div className="flex items-center justify-between gap-3 mb-4">
+                        <h3 className="text-lg font-semibold text-slate-900 flex items-center gap-2">
+                          <Camera className="h-5 w-5 text-blue-600" />
+                          Latest Detection
+                        </h3>
+                        <span className="text-xs font-semibold uppercase tracking-wide text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">
+                          Auto refresh: 30s
+                        </span>
+                      </div>
+
+                      {latestIncident?.imageUrl ? (
+                        <div className="grid gap-4 md:grid-cols-2">
+                          <button
+                            type="button"
+                            onClick={() => setFullscreenImage(latestIncident.imageUrl)}
+                            className="relative overflow-hidden rounded-xl border border-slate-200 bg-slate-900 group"
+                          >
+                            <img
+                              src={latestIncident.imageUrl}
+                              alt="Latest incident"
+                              className="h-56 w-full object-cover transition duration-300 group-hover:scale-[1.02]"
+                              style={invertedPreviewStyle}
+                            />
+                            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-3 text-left">
+                              <p className="text-xs font-medium text-white/90">Tap to expand image</p>
+                            </div>
+                          </button>
+
+                          <div className="space-y-3">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Type</p>
+                                <p className="text-xl font-bold text-slate-900 mt-1">
+                                  {getCrimeTypeLabel(latestIncident.crime_type)}
+                                </p>
+                              </div>
+                              <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${getThreatLevelClasses(latestIncident.threat_level)}`}>
+                                {String(latestIncident.threat_level || "LOW").toUpperCase()}
+                              </span>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                                <p className="text-xs font-semibold uppercase text-red-600">Threat Score</p>
+                                <p className="mt-1 text-2xl font-bold text-red-800">{getThreatScore(latestIncident)}</p>
+                              </div>
+                              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
+                                <p className="text-xs font-semibold uppercase text-blue-600">Confidence</p>
+                                <p className="mt-1 text-2xl font-bold text-blue-800">{getConfidencePercent(latestIncident.confidence)}%</p>
+                              </div>
+                            </div>
+
+                            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                              <p className="text-xs font-semibold uppercase text-slate-500">Captured At</p>
+                              <p className="mt-1 text-sm font-medium text-slate-800">
+                                {formatDateTime(latestIncident.createdAt || latestIncident.updatedAt)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-8 text-center">
+                          <ImageIcon className="h-10 w-10 text-slate-400 mx-auto mb-3" />
+                          <p className="font-semibold text-slate-700">No detected image yet</p>
+                          <p className="text-sm text-slate-500 mt-1">
+                            Latest image and threat details will appear here after the next detection cycle.
+                          </p>
+                        </div>
+                      )}
                     </div>
 
                   </div>

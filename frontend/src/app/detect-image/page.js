@@ -135,9 +135,17 @@ export default function ImageDetectionPage() {
   };
 
   /* ================= DETERMINE CRIME STATUS ================= */
-  /* 🔥 FIXED: Trust backend crime_detected field completely */
   const determineCrimeStatus = (data) => {
-    return Boolean(data.crime_detected);
+    const level = String(data?.threat_level || "").toUpperCase();
+    const score = Number(data?.threat_score || 0);
+
+    // Guard against contradictory payloads (e.g., CRITICAL + crime_detected=false).
+    return (
+      Boolean(data?.crime_detected) ||
+      level === "CRITICAL" ||
+      level === "HIGH" ||
+      score >= 55
+    );
   };
 
   /* ================= SUBMIT ================= */
@@ -253,20 +261,88 @@ export default function ImageDetectionPage() {
 
   /* ================= GET CRIME TYPE DISPLAY ================= */
   const getCrimeTypeDisplay = (data) => {
-    if (data.crime_type) return data.crime_type;
-    if (data.type) return data.type;
-    
-    // If crime is detected but no type specified, show generic message
-    if (data.crime_detected) {
-      const threatLevel = data.threat_level?.toUpperCase();
-      if (threatLevel === "CRITICAL" || threatLevel === "HIGH") {
-        return "Violent Activity";
+    const activities = (data.activities || []).join(" ").toLowerCase();
+    const signals = (data.signals || []).join(" ").toLowerCase();
+    const threatLevel = String(data.threat_level || "").toUpperCase();
+    const threatScore = Number(data.threat_score || 0);
+    const rawCrimeType = String(data.crime_type || data.type || "").trim();
+    const looksSafeType =
+      !rawCrimeType ||
+      rawCrimeType.toLowerCase() === "normal" ||
+      rawCrimeType.toLowerCase().startsWith("normal");
+
+    const hasAssaultEvidence =
+      activities.includes("physical_assault") ||
+      activities.includes("kicking_motion") ||
+      activities.includes("stabbing_attack") ||
+      activities.includes("shooting_threat") ||
+      activities.includes("threatening_gesture") ||
+      signals.includes("dominant_over_fallen") ||
+      signals.includes("fallen") ||
+      signals.includes("direct_assault") ||
+      signals.includes("grab_neck") ||
+      signals.includes("restraining_hold") ||
+      signals.includes("weapon_threat") ||
+      signals.includes("gun_aiming");
+
+    // Highest priority: visible assault/violence cues should never be shown as normal.
+    if (hasAssaultEvidence) {
+      if (signals.includes("dominant_over_fallen") || signals.includes("fallen")) {
+        return "Possible Assault (Person Down)";
+      }
+      if (activities.includes("shooting_threat") || signals.includes("gun_aiming")) {
+        return "Armed Threat";
+      }
+      if (activities.includes("stabbing_attack") || signals.includes("weapon_threat")) {
+        return "Violent Attack";
       }
       return "Suspicious Activity";
     }
-    
+
+    if (
+      activities.includes("cutting") ||
+      activities.includes("working") ||
+      activities.includes("market") ||
+      signals.includes("tool") ||
+      (signals.includes("knife") && !signals.includes("attack"))
+    ) {
+      const isLowRisk = threatLevel === "LOW" || threatLevel === "NORMAL" || threatScore < 30;
+      if (isLowRisk) {
+        return "Normal Activity (Tool Usage)";
+      }
+      return "Suspicious Activity";
+    }
+
+    if (signals.includes("gun") || signals.includes("shoot")) {
+      return "Armed Threat";
+    }
+
+    if (activities.includes("stabbing") || activities.includes("attack")) {
+      return "Violent Attack";
+    }
+
+    if (activities.includes("chasing") || activities.includes("threat")) {
+      return "Suspicious Activity";
+    }
+
+    // If risk is high/critical but type is generic-safe, present suspicious activity.
+    if ((threatLevel === "CRITICAL" || threatLevel === "HIGH" || threatScore >= 55) && looksSafeType) {
+      return "Suspicious Activity";
+    }
+
+    if (data.crime_type) return data.crime_type;
+    if (data.type) return data.type;
+
+    if (data.crime_detected) {
+      return "Suspicious Activity";
+    }
+
     return "Normal Activity";
   };
+
+  const isCrime = result ? determineCrimeStatus(result) : false;
+  const displayActivities = isCrime ? (result?.activities || []) : [];
+  const displaySignals = isCrime ? (result?.signals || []) : [];
 
   return (
     <div className="flex h-screen bg-transparent overflow-hidden">
@@ -438,17 +514,17 @@ export default function ImageDetectionPage() {
             {result ? (
               <>
                 {/* CRIME STATUS */}
-                <div className={`mb-6 p-4 rounded-lg border ${result.crime_detected ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
+                <div className={`mb-6 p-4 rounded-lg border ${isCrime ? 'border-red-300 bg-red-50' : 'border-green-300 bg-green-50'}`}>
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-bold text-lg">
-                      {result.crime_detected ? '🚨 Crime Detected' : '✅ No Crime Detected'}
+                      {isCrime ? '🚨 Crime Detected' : '✅ No Crime Detected'}
                     </h3>
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${result.crime_detected ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-                      {result.crime_detected ? 'ALERT' : 'SAFE'}
+                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${isCrime ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                      {isCrime ? 'ALERT' : 'SAFE'}
                     </span>
                   </div>
-                  <p className="text-slate-700">
-                    {getCrimeTypeDisplay(result)}
+                  <p className="text-slate-700 font-medium">
+                    {isCrime ? getCrimeTypeDisplay(result) : 'Normal Activity'}
                   </p>
                 </div>
 
@@ -482,11 +558,11 @@ export default function ImageDetectionPage() {
 
                 {/* DETAILS */}
                 <div className="space-y-4">
-                  {result.activities && result.activities.length > 0 && (
+                  {displayActivities.length > 0 && (
                     <div>
                       <h4 className="font-medium text-gray-700 mb-2">Activities Detected</h4>
                       <div className="flex flex-wrap gap-2">
-                        {result.activities.map((activity, idx) => (
+                        {displayActivities.map((activity, idx) => (
                           <span
                             key={idx}
                             className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm"
@@ -498,11 +574,11 @@ export default function ImageDetectionPage() {
                     </div>
                   )}
 
-                  {result.signals && result.signals.length > 0 && (
+                  {displaySignals.length > 0 && (
                     <div>
                       <h4 className="font-medium text-gray-700 mb-2">Threat Signals</h4>
                       <div className="flex flex-wrap gap-2">
-                        {result.signals.map((signal, idx) => (
+                        {displaySignals.map((signal, idx) => (
                           <span
                             key={idx}
                             className="px-3 py-1 bg-red-100 text-red-700 rounded-full text-sm"

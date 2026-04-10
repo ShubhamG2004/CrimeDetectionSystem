@@ -36,6 +36,7 @@ except ImportError:
 
 # Import pose detector modules
 from pose_detector import PoseCrimeDetector, MultiLayerValidator
+from reasoning_layer import reasoning_layer
 
 # Flask app configuration
 app = Flask(__name__)
@@ -177,141 +178,102 @@ def _is_portrait_detection(detection: dict) -> bool:
     return True
 
 def reasoning_engine(detection: dict, weapons: list, location: str = "unknown") -> Tuple[float, str]:
-    """
-    Apply business logic to determine final threat level
-    
-    Args:
-        detection: Raw detection results
-        weapons: Detected weapons list
-        location: Location context
-        
-    Returns:
-        Tuple of (threat_score, threat_level)
-    """
-    persons = int(detection.get("persons_detected", 0) or 0)
-    activities = list(detection.get("activities", []) or [])
-    signals = list(detection.get("signals", []) or [])
-    ss = set(signals)
-    aa = set(activities)
-    has_weapon = bool(weapons)
-    agg_trk = bool(detection.get("aggressive_tracking"))
+    """Compatibility wrapper that delegates final level to reasoning_layer."""
+    crime_detected, _crime_type = reasoning_layer(detection, location)
+    raw_score = float(detection.get("threat_score", 0) or 0)
 
-    # FIX 1: Portrait / face-only detection → NORMAL
-    if _is_portrait_detection(detection):
-        logger.debug("Portrait/headshot detected, forcing NORMAL")
-        return 5.0, "NORMAL"
+    if crime_detected:
+        return max(raw_score, 80.0), "CRITICAL"
 
-    # FIX 2: Safe location hard block
-    loc = (location or "").lower().replace(" ", "_")
-    aggression_present = bool(ss & CRIMINAL_SIGNALS) or any(
-        a in aa for a in [
-            "PHYSICAL_ASSAULT", "KICKING_MOTION", "AGGRESSIVE_GESTURE",
-            "CHOKING_MOTION", "SHOOTING_THREAT", "RESTRAINT_ATTEMPT",
-        ]
+    return min(raw_score, 20.0), "NORMAL"
+
+
+def _reconcile_final_decision(detection: dict, crime_detected: bool, crime_type: str) -> Tuple[bool, str, str]:
+    """Prevent contradictory outputs where high raw risk is reported as SAFE.
+
+    The reasoning layer remains the primary decision engine. This guard only
+    escalates when upstream detector output already indicates strong evidence.
+    """
+    final_crime = bool(crime_detected)
+    final_type = crime_type
+
+    raw_score = float(detection.get("threat_score", 0) or 0)
+    raw_level = str(detection.get("threat_level", "") or "").upper()
+    raw_type = str(detection.get("crime_type", "") or "").strip()
+    signals = set(detection.get("signals", []) or [])
+
+    critical_signals = {
+        "DOMINANT_OVER_FALLEN",
+        "DIRECT_ASSAULT",
+        "GUN_AIMING_LEFT",
+        "GUN_AIMING_RIGHT",
+        "GRAB_NECK_LEFT",
+        "GRAB_NECK_RIGHT",
+        "RESTRAINING_HOLD",
+    }
+
+    must_escalate = (
+        raw_score >= 55
+        or raw_level in {"HIGH", "CRITICAL"}
+        or bool(signals & critical_signals)
     )
-    
-    if loc in SAFE_LOCATIONS and not aggression_present:
-        # Strip knife/stab activities — they're cooking, not crime
-        safe_activities = {"STABBING_ATTACK", "ARMED_THREAT", "WEAPON_THREAT",
-                           "THREATENING_GESTURE", "STABBING_MOTION_LEFT", "STABBING_MOTION_RIGHT"}
-        safe_signals = {"KNIFE_WIELDING_LEFT", "KNIFE_WIELDING_RIGHT",
-                        "STABBING_MOTION_LEFT", "STABBING_MOTION_RIGHT",
-                        "WEAPON_THREAT_LEFT", "WEAPON_THREAT_RIGHT"}
-        aa -= safe_activities
-        ss -= safe_signals
-        
-        # After stripping, if nothing criminal remains → NORMAL
-        if not (ss & CRIMINAL_SIGNALS) and not (aa & CRIMINAL_ACTIVITIES):
-            return 8.0, "NORMAL"
 
-    # FIX 4: GUN_AIMING → always CRITICAL
-    if "GUN_AIMING_LEFT" in ss or "GUN_AIMING_RIGHT" in ss:
-        return 98.0, "CRITICAL"
+    if not final_crime and must_escalate:
+        final_crime = True
 
-    # Weapon + people combinations
-    if has_weapon and persons >= 2:
-        return 95.0, "CRITICAL"
-    if has_weapon and persons == 1:
-        return 62.0, "HIGH"
+        if "GUN_AIMING_LEFT" in signals or "GUN_AIMING_RIGHT" in signals:
+            final_type = "Armed Threat"
+        elif "DOMINANT_OVER_FALLEN" in signals or "FALLEN" in signals:
+            final_type = "Physical Assault (Victim on Ground)"
+        elif raw_type and raw_type.lower() not in {"normal", "normal (filtered)", "filtered"}:
+            final_type = raw_type
+        else:
+            final_type = "Suspicious Activity"
 
-    # Pose-based CRITICAL overrides
-    if "DOMINANT_OVER_FALLEN" in ss:
-        return 92.0, "CRITICAL"
-    if "GRAB_NECK_LEFT" in ss or "GRAB_NECK_RIGHT" in ss:
-        return 90.0, "CRITICAL"
-    if "RESTRAINING_HOLD" in ss and "VULNERABLE_POSITION" in ss:
-        return 88.0, "CRITICAL"
-    if "FALLEN" in ss and "GRABBING" in ss and "POWER_IMBALANCE" in ss:
-        return 88.0, "CRITICAL"
+    # Calibrated final level: do not mark every detected crime as CRITICAL.
+    strong_critical_signals = {
+        "GUN_AIMING_LEFT",
+        "GUN_AIMING_RIGHT",
+        "DOMINANT_OVER_FALLEN",
+        "DIRECT_ASSAULT",
+        "GRAB_NECK_LEFT",
+        "GRAB_NECK_RIGHT",
+        "RESTRAINING_HOLD",
+        "ASSAULT_HEAD",
+        "BODY_COLLISION",
+    }
+    has_strong_signal = bool(signals & strong_critical_signals)
+    normalized_type = str(final_type or "").lower()
+    severe_type = any(
+        token in normalized_type
+        for token in ("armed threat", "physical assault", "violent", "choking", "shooting")
+    )
 
-    # FIX 3: Fallen victim inferred at persons==1
-    if "FALLEN" in ss and ("DOMINANT_POSITION" in aa or "POWER_IMBALANCE" in ss):
-        return 85.0, "CRITICAL"
+    if not final_crime:
+        final_level = "NORMAL"
+    elif has_strong_signal or severe_type:
+        if raw_score >= 70:
+            final_level = "CRITICAL"
+        elif raw_score >= 45:
+            final_level = "HIGH"
+        else:
+            final_level = "MEDIUM"
+    elif "suspicious" in normalized_type:
+        if raw_score >= 55:
+            final_level = "HIGH"
+        elif raw_score >= 25:
+            final_level = "MEDIUM"
+        else:
+            final_level = "LOW"
+    else:
+        if raw_score >= 70:
+            final_level = "HIGH"
+        elif raw_score >= 35:
+            final_level = "MEDIUM"
+        else:
+            final_level = "LOW"
 
-    # HIGH level threats
-    if persons >= 2 and "KICKING_MOTION" in aa:
-        return 76.0, "HIGH"
-    if persons >= 2 and "PHYSICAL_ASSAULT" in aa:
-        return 86.0, "HIGH"
-    if "DIRECT_ASSAULT" in ss:
-        return 86.0, "HIGH"
-    if agg_trk and persons >= 2:
-        return 82.0, "HIGH"
-
-    has_aggression = any(a in aa for a in [
-        "PHYSICAL_ASSAULT", "KICKING_MOTION", "AGGRESSIVE_GESTURE",
-        "STABBING_ATTACK", "ARMED_THREAT", "CHOKING_MOTION", "SHOOTING_THREAT",
-    ])
-    has_interaction = any(s in ss for s in [
-        "CLOSE_CONTACT", "BODY_COLLISION", "GRABBING", "DIRECT_ASSAULT",
-    ]) or bool(detection.get("interaction_confirmed"))
-
-    if not has_aggression and not has_weapon and len(signals) < 2:
-        return 10.0, "NORMAL"
-
-    if has_aggression and has_interaction and persons >= 2:
-        return 80.0, "HIGH"
-
-    if persons == 1 and (
-            "GUN_HOLDING_LEFT" in ss or "GUN_HOLDING_RIGHT" in ss
-            or "WEAPON_THREAT_LEFT" in ss or "WEAPON_THREAT_RIGHT" in ss):
-        return 40.0, "MEDIUM"
-
-    # Scored path
-    score = 0.0
-    if persons >= 2:
-        score += 22
-    if has_aggression:
-        score += 28
-    if has_interaction:
-        score += 18
-    if "KICKING_MOTION" in aa:
-        score += 22
-    if "PHYSICAL_ASSAULT" in aa:
-        score += 30
-    if "FOLLOWING_CHASING" in aa:
-        score += 18
-    if "STABBING_ATTACK" in aa:
-        score += 40
-    if "SHOOTING_THREAT" in aa:
-        score += 45
-    if "RESTRAINT_ATTEMPT" in aa:
-        score += 28
-    if agg_trk:
-        score += 12
-
-    base = float(detection.get("threat_score", 0) or 0)
-    score += 0.25 * min(100.0, max(0.0, base))
-
-    logger.debug(f"Signals: {signals}, Activities: {list(aa)}, Score: {score:.1f}, Location: {location}")
-
-    if score >= 80:
-        return score, "CRITICAL"
-    if score >= 55:
-        return score, "HIGH"
-    if score >= 28:
-        return score, "MEDIUM"
-    return score, "NORMAL"
+    return final_crime, final_type, final_level
 
 
 def generate_explanation(level: str, detection: dict, weapons: list) -> str:
@@ -340,6 +302,9 @@ def generate_explanation(level: str, detection: dict, weapons: list) -> str:
     
     if level == "MEDIUM":
         return "MEDIUM — Suspicious activity detected. Recommend review and monitoring."
+
+    if level == "LOW":
+        return "LOW — Mild suspicious cues detected. Continue monitoring."
     
     if detection.get("rejected_at_layer"):
         return f"Filtered ({detection.get('rejected_at_layer')}). No reliable evidence of crime."
@@ -463,47 +428,17 @@ def detect_image():
             if len(_track_history) > 50:
                 _track_history.clear()
 
-    # Apply reasoning engine
-    if detection.get("rejected_at_layer"):
-        final_score = float(detection.get("threat_score", 0) or 0)
-        final_level = "LOW"
-        crime_detected = False
-        crime_type = "Normal"
-    else:
-        final_score, final_level = reasoning_engine(detection, weapons, location=location)
-        crime_detected = final_level in ("HIGH", "CRITICAL")
+    crime_detected, crime_type = reasoning_layer(detection, location)
+    crime_detected, crime_type, final_level = _reconcile_final_decision(
+        detection, crime_detected, crime_type
+    )
 
-        if final_level == "CRITICAL":
-            crime_type = "Armed Threat" if weapons else "Physical Violence"
-        elif final_level == "HIGH":
-            crime_type = "Physical Violence"
-        elif final_level == "MEDIUM":
-            crime_type = "Suspicious Activity"
-        else:
-            crime_type = "Normal"
+    # Optional crowd-scene calibration: reduce inflated aggregate score when
+    # many people are present in a single frame.
+    if int(detection.get("persons_detected", 0) or 0) >= 5:
+        detection["threat_score"] = float(detection.get("threat_score", 0) or 0) * 0.5
 
-        # Final safety guard
-        persons_final = int(detection.get("persons_detected", 0) or 0)
-        ss_final = set(detection.get("signals", []) or [])
-        gun_aiming = "GUN_AIMING_LEFT" in ss_final or "GUN_AIMING_RIGHT" in ss_final
-        fallen_pattern = (
-            "DOMINANT_OVER_FALLEN" in ss_final
-            or ("FALLEN" in ss_final and (
-                "DOMINANT_POSITION" in (detection.get("activities") or [])
-                or "POWER_IMBALANCE" in ss_final
-            ))
-        )
-
-        if (not weapons and persons_final < 2 and not gun_aiming and not fallen_pattern
-                and final_level in ("HIGH", "CRITICAL")):
-            has_clear_criminal = bool(ss_final & {
-                "GRAB_NECK_LEFT", "GRAB_NECK_RIGHT", "DIRECT_ASSAULT",
-                "RESTRAINING_HOLD", "ASSAULT_HEAD",
-            })
-            if not has_clear_criminal:
-                final_level = "MEDIUM"
-                crime_type = "Suspicious Activity"
-                crime_detected = False
+    final_score = float(detection.get("threat_score", 0) or 0)
 
     explanation = generate_explanation(final_level, detection, weapons)
     confidence = round(min(1.0, max(0.0, final_score / 100.0)), 3)
@@ -538,7 +473,7 @@ def detect_image():
         "system_status": "operational",
     }
 
-    if final_level in ("HIGH", "CRITICAL"):
+    if crime_detected:
         logger.warning(f"🚨 {final_level}: {crime_type} @ {location} "
                        f"score={final_score:.1f} conf={confidence}")
 
@@ -587,19 +522,18 @@ def batch_detect():
         det["raw_threat_score"] = det.get("threat_score")
         wp = det.get("weapons", []) or []
 
-        if det.get("rejected_at_layer"):
-            fs, fl = 0.0, "LOW"
-            ct = "Normal"
-        else:
-            fs, fl = reasoning_engine(det, wp, location=location)
-            ct = ("Armed Threat" if fl == "CRITICAL" and wp else
-                  "Physical Violence" if fl in ("HIGH", "CRITICAL") else
-                  "Suspicious Activity" if fl == "MEDIUM" else "Normal")
+        crime_detected, ct = reasoning_layer(det, location)
+        crime_detected, ct, fl = _reconcile_final_decision(det, crime_detected, ct)
+
+        if int(det.get("persons_detected", 0) or 0) >= 5:
+            det["threat_score"] = float(det.get("threat_score", 0) or 0) * 0.5
+
+        fs = float(det.get("threat_score", 0) or 0)
 
         results.append({
             "filename": secure_filename(file.filename),
             "detection": {
-                "crime_detected": fl in ("HIGH", "CRITICAL"),
+                "crime_detected": crime_detected,
                 "crime_type": ct,
                 "threat_level": fl,
                 "threat_score": float(fs),
