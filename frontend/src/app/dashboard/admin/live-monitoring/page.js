@@ -1,1 +1,2 @@
-export { default } from "../map/page";
+﻿export { default } from "../map/page";
+

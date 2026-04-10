@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -66,19 +66,19 @@ export default function CameraApprovalOverview() {
 
         <div className="p-6 space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="app-card p-5 border-l-4 border-amber-400">
+            <div className="app-card p-5 border-l-4 border-orange-400">
               <p className="text-sm text-slate-500">Pending Approval</p>
-              <h3 className="text-2xl font-semibold text-amber-700 mt-1">{counters.pending}</h3>
+              <h3 className="text-2xl font-semibold text-orange-700 mt-1">{counters.pending}</h3>
             </div>
 
-            <div className="app-card p-5 border-l-4 border-emerald-500">
+            <div className="app-card p-5 border-l-4 border-orange-500">
               <p className="text-sm text-slate-500">Approved</p>
-              <h3 className="text-2xl font-semibold text-emerald-700 mt-1">{counters.approved}</h3>
+              <h3 className="text-2xl font-semibold text-orange-700 mt-1">{counters.approved}</h3>
             </div>
 
-            <div className="app-card p-5 border-l-4 border-rose-500">
+            <div className="app-card p-5 border-l-4 border-orange-500">
               <p className="text-sm text-slate-500">Rejected</p>
-              <h3 className="text-2xl font-semibold text-rose-700 mt-1">{counters.rejected}</h3>
+              <h3 className="text-2xl font-semibold text-orange-700 mt-1">{counters.rejected}</h3>
             </div>
           </div>
 
@@ -141,3 +141,4 @@ export default function CameraApprovalOverview() {
     </div>
   );
 }
+

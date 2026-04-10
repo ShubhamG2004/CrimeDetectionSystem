@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { useEffect, useRef } from "react";
@@ -27,7 +27,7 @@ const kpiCards = [
     value: "Operational",
     trend: "+99.9% uptime",
     icon: CheckCircle2,
-    iconColor: "text-emerald-600",
+    iconColor: "text-orange-600",
     accent: "from-white via-zinc-50 to-neutral-100 border border-black/5",
   },
   {
@@ -35,7 +35,7 @@ const kpiCards = [
     value: "Citywide",
     trend: "156 active cameras",
     icon: Activity,
-    iconColor: "text-blue-600",
+    iconColor: "text-orange-600",
     accent: "from-white via-zinc-100 to-neutral-50 border border-black/5",
   },
   {
@@ -43,15 +43,15 @@ const kpiCards = [
     value: "High",
     trend: "Avg. 2.4 min response",
     icon: Shield,
-    iconColor: "text-purple-600",
+    iconColor: "text-orange-600",
     accent: "from-white via-zinc-50 to-neutral-200 border border-black/5",
   },
   {
     title: "Active Alerts",
     value: "3",
-    trend: "2 critical · 1 warning",
+    trend: "2 critical - 1 warning",
     icon: AlertTriangle,
-    iconColor: "text-amber-600",
+    iconColor: "text-orange-600",
     accent: "from-white via-zinc-50 to-neutral-200 border border-black/5",
   },
 ];
@@ -238,7 +238,7 @@ export default function AdminDashboard() {
                 { time: "1 hour ago", event: "System health check completed", type: "info" },
               ].map((activity, idx) => (
                 <div key={idx} className="flex items-center gap-3 py-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <div className="h-1.5 w-1.5 rounded-full bg-orange-500" />
                   <p className="text-sm text-slate-600 flex-1">{activity.event}</p>
                   <span className="text-xs text-slate-400">{activity.time}</span>
                 </div>

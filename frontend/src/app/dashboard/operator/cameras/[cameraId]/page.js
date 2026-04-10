@@ -62,21 +62,49 @@ const getCrimeTypeLabel = (value) => {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 };
 
+const parseMetricNumber = (value) => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    if (!normalized) return null;
+
+    // Accept formats like "0.82", "82", or "82%".
+    const direct = Number(normalized.replace("%", ""));
+    if (Number.isFinite(direct)) return direct;
+  }
+
+  return null;
+};
+
 const getThreatScore = (incident) => {
-  const explicitScore = Number(incident?.threat_score);
+  const explicitScore = parseMetricNumber(incident?.threat_score);
   if (Number.isFinite(explicitScore) && explicitScore >= 0) {
     return Math.max(0, Math.min(100, Math.round(explicitScore)));
   }
 
-  const confidence = Number(incident?.confidence) || 0;
+  const confidenceRaw = parseMetricNumber(incident?.confidence);
+  const confidence =
+    confidenceRaw == null
+      ? 0
+      : confidenceRaw > 1
+      ? confidenceRaw / 100
+      : confidenceRaw;
   const level = String(incident?.threat_level || "LOW").toUpperCase();
   const levelBoost = level === "CRITICAL" ? 20 : level === "HIGH" ? 14 : level === "MEDIUM" ? 8 : 2;
 
   return Math.max(0, Math.min(100, Math.round(confidence * 100 + levelBoost)));
 };
 
-const getConfidencePercent = (value) =>
-  Math.max(0, Math.min(100, Math.round((Number(value) || 0) * 100)));
+const getConfidencePercent = (value) => {
+  const parsed = parseMetricNumber(value);
+  if (parsed == null) return 0;
+
+  const normalized = parsed > 1 ? parsed : parsed * 100;
+  return Math.max(0, Math.min(100, Math.round(normalized)));
+};
 
 const getThreatLevelClasses = (level) => {
   const normalized = String(level || "LOW").toUpperCase();

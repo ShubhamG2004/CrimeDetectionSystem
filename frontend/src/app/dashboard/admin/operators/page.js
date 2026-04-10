@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -229,7 +229,7 @@ export default function ManageOperators() {
       <AdminSidebar />
 
       <div className="flex-1">
-        <Navbar title="👮 Operator Management" />
+        <Navbar title="Operator Management" />
 
         <div className="p-6">
           {/* HEADER */}
@@ -275,7 +275,7 @@ export default function ManageOperators() {
                         {op.cameras?.map((id) => (
                           <span
                             key={id}
-                            className="px-2.5 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-medium"
+                            className="px-2.5 py-1 bg-orange-50 text-orange-700 rounded-md text-xs font-medium"
                           >
                             {cameraMap[id] || id}
                           </span>
@@ -287,8 +287,8 @@ export default function ManageOperators() {
                       <span
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
                           op.status === "active"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
+                            ? "bg-orange-100 text-orange-800"
+                            : "bg-slate-200 text-slate-700"
                         }`}
                       >
                         {op.status}
@@ -304,7 +304,7 @@ export default function ManageOperators() {
                             month: "short",
                             day: "numeric"
                           })
-                        : "—"}
+                        : "-"}
                     </td>
 
                     <td className="p-3 text-center space-x-2">
@@ -320,7 +320,7 @@ export default function ManageOperators() {
                           setResetUid(op.uid);
                           setNewPassword("");
                         }}
-                        className="px-3 py-1.5 bg-amber-600 text-white text-xs rounded-md font-medium hover:bg-amber-700 transition"
+                        className="px-3 py-1.5 bg-orange-600 text-white text-xs rounded-md font-medium hover:bg-orange-700 transition"
                       >
                         Reset Password
                       </button>
@@ -329,8 +329,8 @@ export default function ManageOperators() {
                         onClick={() => toggleStatus(op.uid, op.status)}
                         className={`px-3 py-1.5 text-white text-xs rounded-md font-medium transition ${
                           op.status === "active"
-                            ? "bg-rose-600 hover:bg-rose-700"
-                            : "bg-emerald-600 hover:bg-emerald-700"
+                            ? "bg-orange-600 hover:bg-orange-700"
+                            : "bg-orange-600 hover:bg-orange-700"
                         }`}
                       >
                         {op.status === "active" ? "Disable" : "Enable"}
@@ -551,7 +551,7 @@ export default function ManageOperators() {
                 </button>
                 <button
                   onClick={resetPassword}
-                  className="rounded-xl bg-rose-600 px-4 py-2 text-sm font-semibold text-white hover:bg-rose-700"
+                  className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
                 >
                   Reset
                 </button>

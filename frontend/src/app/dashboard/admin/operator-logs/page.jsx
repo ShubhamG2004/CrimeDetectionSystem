@@ -46,16 +46,16 @@ export default function OperatorLogs() {
   }, [router]);
 
   return (
-    <div className="flex min-h-screen bg-gray-100">
+    <div className="flex min-h-screen bg-slate-50">
       <AdminSidebar />
 
       <div className="flex-1">
-        <Navbar title="📜 Operator Activity Logs" />
+        <Navbar title="Operator Activity Logs" />
 
         <div className="p-6">
-          <div className="bg-white rounded-lg shadow overflow-x-auto">
+          <div className="bg-white rounded-lg shadow-[0_10px_24px_rgba(15,23,42,0.08)] overflow-x-auto border border-slate-200">
             <table className="w-full text-sm">
-              <thead className="bg-gray-100">
+              <thead className="bg-orange-50">
                 <tr>
                   <th className="p-3 text-left">Operator</th>
                   <th className="p-3 text-left">Action</th>
@@ -68,17 +68,17 @@ export default function OperatorLogs() {
               <tbody>
                 {!loading &&
                   logs.map((log) => (
-                    <tr key={log.id} className="border-t">
+                    <tr key={log.id} className="border-t border-slate-200 hover:bg-orange-50/50">
                       <td className="p-3">{log.operatorEmail}</td>
-                      <td className="p-3 font-medium">{log.action}</td>
+                      <td className="p-3 font-medium text-slate-900">{log.action}</td>
                       <td className="p-3">{log.description}</td>
-                      <td className="p-3">{log.cameraId || "—"}</td>
-                      <td className="p-3 text-gray-600">
+                      <td className="p-3">{log.cameraId || "-"}</td>
+                      <td className="p-3 text-slate-600">
                         {log.createdAt?.seconds
                           ? new Date(
                               log.createdAt.seconds * 1000
                             ).toLocaleString()
-                          : "—"}
+                          : "-"}
                       </td>
                     </tr>
                   ))}
@@ -87,13 +87,13 @@ export default function OperatorLogs() {
 
             {/* STATES */}
             {loading && (
-              <p className="p-6 text-center text-gray-600">
-                Loading activity logs…
+              <p className="p-6 text-center text-slate-600">
+                Loading activity logs...
               </p>
             )}
 
             {!loading && logs.length === 0 && (
-              <p className="p-6 text-center text-gray-600">
+              <p className="p-6 text-center text-slate-600">
                 No activity logs found
               </p>
             )}

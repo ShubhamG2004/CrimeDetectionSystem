@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -40,7 +40,7 @@ export default function PoliceStationsPage() {
   const [pinLocation, setPinLocation] = useState(null); // { lat, lng }
   const [saving, setSaving] = useState(false);
 
-  /* ─── AUTH GUARD ─── */
+  /* AUTH GUARD */
   useEffect(() => {
     if (checkedRef.current) return;
     checkedRef.current = true;
@@ -53,7 +53,7 @@ export default function PoliceStationsPage() {
     });
   }, [router]);
 
-  /* ─── FETCH ─── */
+  /* FETCH */
   const fetchStations = async () => {
     try {
       const token = await auth.currentUser.getIdToken();
@@ -69,7 +69,7 @@ export default function PoliceStationsPage() {
     }
   };
 
-  /* ─── SAVE (CREATE / UPDATE) ─── */
+  /* SAVE (CREATE / UPDATE) */
   const saveStation = async () => {
     if (!form.stationName.trim() || !form.contactNumber.trim()) {
       alert("Station Name and Contact Number are required");
@@ -124,7 +124,7 @@ export default function PoliceStationsPage() {
     }
   };
 
-  /* ─── DELETE ─── */
+  /* DELETE */
   const deleteStation = async (id, name) => {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
 
@@ -140,7 +140,7 @@ export default function PoliceStationsPage() {
     }
   };
 
-  /* ─── HELPERS ─── */
+  /* HELPERS */
   const openEdit = (s) => {
     setEditingId(s.id);
     setForm({
@@ -177,13 +177,13 @@ export default function PoliceStationsPage() {
     />
   );
 
-  /* ─── RENDER ─── */
+  /* RENDER */
   return (
     <div className="app-shell flex">
       <AdminSidebar />
 
       <div className="flex-1">
-        <Navbar title="🚓 Police Stations" />
+        <Navbar title="Police Stations" />
 
         <div className="p-6">
           {/* HEADER */}
@@ -206,7 +206,7 @@ export default function PoliceStationsPage() {
               }}
               className="app-button"
             >
-              ➕ Add Station
+              + Add Station
             </button>
           </div>
 
@@ -233,11 +233,11 @@ export default function PoliceStationsPage() {
                   >
                     <td className="p-3 font-medium">{s.stationName}</td>
                     <td className="p-3 text-slate-500">
-                      {s.stationCode || "—"}
+                      {s.stationCode || "-"}
                     </td>
                     <td className="p-3">
                       <span className="font-medium">
-                        {s.location?.area || "—"}
+                        {s.location?.area || "-"}
                       </span>
                       {s.location?.city && (
                         <span className="text-slate-400">
@@ -253,16 +253,16 @@ export default function PoliceStationsPage() {
                     <td className="p-3">
                       <div>{s.contactNumber}</div>
                       {s.emergencyNumber && (
-                        <div className="text-xs text-rose-600">
-                          🚨 {s.emergencyNumber}
+                        <div className="text-xs text-orange-600">
+                          Emergency: {s.emergencyNumber}
                         </div>
                       )}
                     </td>
-                    <td className="p-3">{s.officerInCharge || "—"}</td>
+                    <td className="p-3">{s.officerInCharge || "-"}</td>
                     <td className="p-3 text-center">
                       {s.jurisdictionRadius != null
                         ? s.jurisdictionRadius
-                        : "—"}
+                        : "-"}
                     </td>
                     <td className="p-3 text-center space-x-2">
                       <button
@@ -273,7 +273,7 @@ export default function PoliceStationsPage() {
                       </button>
                       <button
                         onClick={() => deleteStation(s.id, s.stationName)}
-                        className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs rounded"
+                        className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-xs rounded"
                       >
                         Delete
                       </button>
@@ -291,12 +291,12 @@ export default function PoliceStationsPage() {
             )}
 
             {loading && (
-              <p className="p-8 text-center text-slate-500">Loading…</p>
+              <p className="p-8 text-center text-slate-500">Loading...</p>
             )}
           </div>
         </div>
 
-        {/* ─── MODAL ─── */}
+        {/* MODAL */}
         {showModal && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="app-card w-full max-w-2xl max-h-[92vh] overflow-y-auto p-6">
@@ -326,11 +326,11 @@ export default function PoliceStationsPage() {
                 </div>
               </div>
 
-              {/* ── LOCATION SECTION ── */}
+              {/* LOCATION SECTION */}
               <div className="mt-3 border border-slate-200 rounded-xl p-4 bg-slate-50">
                 <div className="flex items-center justify-between mb-3">
                   <p className="text-sm font-semibold text-slate-700">
-                    📍 Station Location
+                    Station Location
                   </p>
                   <button
                     type="button"
@@ -348,9 +348,9 @@ export default function PoliceStationsPage() {
                         () => alert("Unable to retrieve your location.")
                       );
                     }}
-                    className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg"
+                    className="flex items-center gap-1 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs rounded-lg"
                   >
-                    🎯 Use My Location
+                    Use My Location
                   </button>
                 </div>
 
@@ -413,12 +413,12 @@ export default function PoliceStationsPage() {
                 {/* Status */}
                 <div className="mt-2 text-xs">
                   {pinLocation ? (
-                    <span className="inline-flex items-center gap-1 text-emerald-600 font-medium">
-                      ✅ Pinned at {pinLocation.lat}, {pinLocation.lng}
+                    <span className="inline-flex items-center gap-1 text-orange-600 font-medium">
+                      Pinned at {pinLocation.lat}, {pinLocation.lng}
                       <button
                         type="button"
                         onClick={() => setPinLocation(null)}
-                        className="ml-2 text-slate-400 hover:text-rose-500 underline"
+                        className="ml-2 text-slate-400 hover:text-orange-500 underline"
                       >
                         Clear
                       </button>
@@ -441,7 +441,7 @@ export default function PoliceStationsPage() {
                   disabled={saving}
                   className="px-4 py-2 bg-slate-900 text-white rounded-lg text-sm disabled:opacity-60"
                 >
-                  {saving ? "Saving…" : "Save"}
+                  {saving ? "Saving..." : "Save"}
                 </button>
               </div>
             </div>
@@ -451,3 +451,4 @@ export default function PoliceStationsPage() {
     </div>
   );
 }
+

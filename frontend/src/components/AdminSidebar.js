@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -26,25 +26,25 @@ export default function AdminSidebar() {
   const navItemClass = (active) =>
     `flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 ${
       active
-        ? "bg-black text-white"
-        : "text-gray-600 font-medium hover:bg-gray-100"
+        ? "bg-slate-900 text-white shadow-[0_10px_24px_rgba(15,23,42,0.22)]"
+        : "text-slate-600 font-medium hover:bg-orange-50 hover:text-orange-700"
     }`;
 
   const iconClass = (active) =>
-    active ? "h-5 w-5 text-white" : "h-5 w-5 text-gray-600";
+    active ? "h-5 w-5 text-orange-300" : "h-5 w-5 text-slate-600";
 
   const labelClass = (active) =>
-    active ? "text-white" : "text-gray-600";
+    active ? "text-white" : "text-slate-600";
 
   return (
-    <aside className="w-64 h-screen bg-white border-r border-gray-200 px-4 py-6 flex flex-col justify-between">
+    <aside className="w-64 h-screen bg-white border-r border-slate-200 px-4 py-6 flex flex-col justify-between">
       
       {/* Top Section */}
       <div>
         {/* Logo / Header */}
         <div className="flex items-center gap-3 mb-8">
-          <div className="h-10 w-10 rounded-xl border border-slate-200 bg-white flex items-center justify-center shadow-sm">
-            <Shield className="h-5 w-5 text-slate-600" />
+          <div className="h-10 w-10 rounded-xl border border-orange-200 bg-orange-50 flex items-center justify-center shadow-sm">
+            <Shield className="h-5 w-5 text-orange-600" />
           </div>
           <div>
             <h2 className="text-lg font-bold text-slate-900">
@@ -207,8 +207,8 @@ export default function AdminSidebar() {
       </div>
 
       {/* Bottom Info Panel */}
-      <div className="mt-8 p-4 text-xs text-slate-500 border-t border-slate-200">
-        <p className="font-medium text-slate-700 mb-1">
+      <div className="mt-8 p-4 text-xs text-slate-500 border-t border-slate-200 bg-orange-50/50 rounded-xl">
+        <p className="font-medium text-slate-800 mb-1">
           Security Status
         </p>
         <p>
@@ -219,3 +219,4 @@ export default function AdminSidebar() {
     </aside>
   );
 }
+

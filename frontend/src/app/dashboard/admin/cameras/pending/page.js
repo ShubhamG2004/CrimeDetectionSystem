@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -42,7 +42,7 @@ export default function PendingCamerasPage() {
       });
 
     setCameras(camerasData);
-    console.log("📷 Camera Data:", camerasData);
+    console.log("Camera Data:", camerasData);
     setLoading(false);
   };
 
@@ -160,14 +160,14 @@ export default function PendingCamerasPage() {
                       <button
                         onClick={() => updateCameraStatus(cam, "approved")}
                         disabled={actionLoadingId === cam.id}
-                        className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs rounded disabled:opacity-60"
+                        className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-xs rounded disabled:opacity-60"
                       >
                         Approve
                       </button>
                       <button
                         onClick={() => updateCameraStatus(cam, "rejected")}
                         disabled={actionLoadingId === cam.id}
-                        className="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white text-xs rounded disabled:opacity-60"
+                        className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-xs rounded disabled:opacity-60"
                       >
                         Reject
                       </button>
@@ -187,3 +187,4 @@ export default function PendingCamerasPage() {
     </div>
   );
 }
+

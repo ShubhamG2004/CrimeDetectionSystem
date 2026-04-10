@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -259,8 +259,8 @@ export default function FieldOperatorsPage() {
                       <span
                         className={`px-3 py-1 rounded-full text-xs font-semibold ${
                           (op.status || "active") === "active"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-rose-100 text-rose-700"
+                            ? "bg-orange-100 text-orange-700"
+                            : "bg-orange-100 text-orange-700"
                         }`}
                       >
                         {(op.status || "active").toUpperCase()}
@@ -279,7 +279,7 @@ export default function FieldOperatorsPage() {
                           setResetUid(op.uid);
                           setNewPassword("");
                         }}
-                        className="px-3 py-1 bg-amber-600 text-white text-xs rounded"
+                        className="px-3 py-1 bg-orange-600 text-white text-xs rounded"
                       >
                         Change Password
                       </button>
@@ -288,8 +288,8 @@ export default function FieldOperatorsPage() {
                         onClick={() => toggleStatus(op.uid, op.status || "active")}
                         className={`px-3 py-1 text-white text-xs rounded ${
                           (op.status || "active") === "active"
-                            ? "bg-rose-600"
-                            : "bg-emerald-600"
+                            ? "bg-orange-600"
+                            : "bg-orange-600"
                         }`}
                       >
                         {(op.status || "active") === "active" ? "Disable" : "Enable"}
@@ -365,7 +365,7 @@ export default function FieldOperatorsPage() {
                 </button>
                 <button
                   onClick={resetPassword}
-                  className="px-4 py-2 bg-amber-600 text-white rounded-lg"
+                  className="px-4 py-2 bg-orange-600 text-white rounded-lg"
                 >
                   Update Password
                 </button>
@@ -377,3 +377,4 @@ export default function FieldOperatorsPage() {
     </div>
   );
 }
+

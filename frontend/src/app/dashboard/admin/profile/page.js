@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -46,14 +46,14 @@ const resolveStatusTone = (status) => {
   const normalized = (status || "active").toLowerCase();
 
   if (normalized === "suspended") {
-    return "border-rose-200 bg-rose-50 text-rose-700";
+    return "border-orange-200 bg-orange-50 text-orange-700";
   }
 
   if (normalized === "inactive") {
-    return "border-amber-200 bg-amber-50 text-amber-700";
+    return "border-orange-200 bg-orange-50 text-orange-700";
   }
 
-  return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  return "border-orange-200 bg-orange-50 text-orange-700";
 };
 
 const asDate = (value, fallback = null) => {
@@ -428,10 +428,10 @@ export default function AdminProfilePage() {
               <p className="mt-4 text-slate-600">Loading profile...</p>
             </div>
           ) : error ? (
-            <div className="rounded-2xl border border-rose-200 bg-rose-50 p-6">
+            <div className="rounded-2xl border border-orange-200 bg-orange-50 p-6">
               <div className="flex items-center gap-3">
-                <AlertCircle className="h-5 w-5 text-rose-600" />
-                <p className="text-rose-700">{error}</p>
+                <AlertCircle className="h-5 w-5 text-orange-600" />
+                <p className="text-orange-700">{error}</p>
               </div>
             </div>
           ) : !profile ? (
@@ -465,8 +465,8 @@ export default function AdminProfilePage() {
                 <div
                   className={`rounded-xl border px-4 py-3 text-sm font-medium ${
                     feedback.type === "error"
-                      ? "border-rose-200 bg-rose-50 text-rose-700"
-                      : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                      ? "border-orange-200 bg-orange-50 text-orange-700"
+                      : "border-orange-200 bg-orange-50 text-orange-700"
                   }`}
                 >
                   {feedback.message}
@@ -617,7 +617,7 @@ export default function AdminProfilePage() {
                   className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-800"
                   aria-label="Close edit profile"
                 >
-                  <span className="text-lg">×</span>
+                  <span className="text-lg">x</span>
                 </button>
 
                 <div className="mb-6 flex items-start gap-3 pr-12">
@@ -660,7 +660,7 @@ export default function AdminProfilePage() {
                       <button
                         type="button"
                         onClick={handlePhotoClear}
-                        className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-rose-200 hover:text-rose-600"
+                        className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-orange-200 hover:text-orange-600"
                       >
                         Remove
                       </button>

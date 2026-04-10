@@ -48,17 +48,17 @@ export default function AdminMapPage() {
 
   if (loading) {
     return (
-      <div className="p-6 text-center text-gray-600">
-        ⏳ Loading map…
+      <div className="p-6 text-center text-slate-600">
+        Loading map...
       </div>
     );
   }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-slate-50">
       
       {/* Sidebar - Static */}
-      <div className="w-64 bg-white shadow-md overflow-hidden">
+      <div className="w-64 bg-white border-r border-slate-200 overflow-hidden">
         <AdminSidebar />
       </div>
 
@@ -66,12 +66,12 @@ export default function AdminMapPage() {
       <div className="flex flex-col flex-1 overflow-hidden">
         
         {/* Navbar */}
-        <div className="sticky top-0 z-10 bg-white shadow">
-          <Navbar title="🌍 Incident Map" />
+        <div className="sticky top-0 z-10 bg-white shadow-[0_6px_16px_rgba(15,23,42,0.06)]">
+          <Navbar title="Incident Map" />
         </div>
 
         {/* Page Content - Static */}
-        <div className="flex-1 p-6 bg-gray-100">
+        <div className="flex-1 p-6 bg-slate-50">
           <IncidentMap incidents={incidents} />
         </div>
 
