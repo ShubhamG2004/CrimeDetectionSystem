@@ -26,6 +26,19 @@ const parseJSON = (value) => {
   }
 };
 
+const decideCrimeDetected = ({ crime_detected = false, threat_level = "LOW", threat_score = 0 }) => {
+  const normalizedLevel = String(threat_level || "").toUpperCase();
+  const normalizedScore = Number(threat_score) || 0;
+
+  // Keep ESP32 and laptop paths aligned even when AI payload is contradictory.
+  return (
+    Boolean(crime_detected) ||
+    normalizedLevel === "CRITICAL" ||
+    normalizedLevel === "HIGH" ||
+    normalizedScore >= 55
+  );
+};
+
 /* --------------------------------------------------
    🧠 Decision Source of Truth
 -------------------------------------------------- */
@@ -156,16 +169,14 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
     const finalSignals = Array.isArray(signals) ? signals : [];
     const finalActivities = Array.isArray(activities) ? activities : [];
 
-    // Trust AI outputs directly. Optional safety override only escalates when
-    // score is high but crime_detected is false.
+    // Trust AI output decision from the server-side reasoning pipeline.
     const threat_score = Number.isFinite(Number(aiThreatScore)) ? Number(aiThreatScore) : 0;
-    let finalCrimeDetected = Boolean(aiCrimeDetected);
+    let finalCrimeDetected = decideCrimeDetected({
+      crime_detected: aiCrimeDetected,
+      threat_level,
+      threat_score,
+    });
     let finalCrimeType = type;
-
-    if (!finalCrimeDetected && threat_score > 60) {
-      finalCrimeDetected = true;
-      finalCrimeType = "Suspicious Activity";
-    }
 
     /* ---------- CLOUDINARY UPLOAD ---------- */
     const imageBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString(
@@ -240,7 +251,7 @@ router.post("/image", verifyToken, upload.single("image"), async (req, res) => {
       finalCrimeDetected &&
       shouldTriggerAlert({
         threat_level,
-        threat_score,
+        crime_type: finalCrimeType,
       })
     ) {
       try {
@@ -380,16 +391,14 @@ router.post("/esp32-image", upload.single("image"), async (req, res) => {
     const finalSignals = Array.isArray(signals) ? signals : [];
     const finalActivities = Array.isArray(activities) ? activities : [];
 
-    // Trust AI outputs directly. Optional safety override only escalates when
-    // score is high but crime_detected is false.
+    // Trust AI output decision from the server-side reasoning pipeline.
     const threat_score = Number.isFinite(Number(aiThreatScore)) ? Number(aiThreatScore) : 0;
-    let finalCrimeDetected = Boolean(aiCrimeDetected);
+    let finalCrimeDetected = decideCrimeDetected({
+      crime_detected: aiCrimeDetected,
+      threat_level,
+      threat_score,
+    });
     let finalCrimeType = type;
-
-    if (!finalCrimeDetected && threat_score > 60) {
-      finalCrimeDetected = true;
-      finalCrimeType = "Suspicious Activity";
-    }
 
     const imageBase64 = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
     const uploadRes = await cloudinary.uploader.upload(imageBase64, {
@@ -450,7 +459,7 @@ router.post("/esp32-image", upload.single("image"), async (req, res) => {
       finalCrimeDetected &&
       shouldTriggerAlert({
         threat_level,
-        threat_score,
+        crime_type: finalCrimeType,
       })
     ) {
       try {

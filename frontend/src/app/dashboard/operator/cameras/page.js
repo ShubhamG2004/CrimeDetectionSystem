@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
@@ -55,10 +55,63 @@ export default function OperatorCamerasPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [mounted, setMounted] = useState(false);
+  const [laptopCameraEnabled, setLaptopCameraEnabled] = useState(false);
+  const [laptopCameraError, setLaptopCameraError] = useState("");
+  const laptopVideoRef = useRef(null);
+  const laptopStreamRef = useRef(null);
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const stopLaptopCamera = useCallback(() => {
+    if (laptopStreamRef.current) {
+      laptopStreamRef.current.getTracks().forEach((track) => track.stop());
+      laptopStreamRef.current = null;
+    }
+
+    if (laptopVideoRef.current) {
+      laptopVideoRef.current.srcObject = null;
+    }
+
+    setLaptopCameraEnabled(false);
+  }, []);
+
+  const startLaptopCamera = useCallback(async () => {
+    try {
+      setLaptopCameraError("");
+
+      if (!navigator?.mediaDevices?.getUserMedia) {
+        setLaptopCameraError("Laptop camera is not supported in this browser.");
+        return;
+      }
+
+      stopLaptopCamera();
+
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "user" },
+        audio: false,
+      });
+
+      laptopStreamRef.current = stream;
+
+      if (laptopVideoRef.current) {
+        laptopVideoRef.current.srcObject = stream;
+      }
+
+      setLaptopCameraEnabled(true);
+    } catch (err) {
+      console.error("Failed to start laptop camera:", err);
+      setLaptopCameraError("Unable to access laptop camera. Please allow camera permission.");
+      setLaptopCameraEnabled(false);
+    }
+  }, [stopLaptopCamera]);
+
+  useEffect(() => {
+    return () => {
+      stopLaptopCamera();
+    };
+  }, [stopLaptopCamera]);
 
   const loadData = useCallback(async (user) => {
     try {
@@ -280,19 +333,87 @@ export default function OperatorCamerasPage() {
             </div>
           )}
 
-          {!loading && !error && filteredCameras.length === 0 && (
-            <div className="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500 shadow-sm">
-              No cameras found.
-            </div>
-          )}
-
-          {!loading && !error && filteredCameras.length > 0 && (
+          {!loading && !error && (
             <div className="space-y-3">
               <div className="sticky top-0 z-10 rounded-2xl border border-slate-200 bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-sm">
-                Assigned Cameras ({filteredCameras.length})
+                Assigned Cameras ({filteredCameras.length}) + Laptop Camera
               </div>
 
               <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <div
+                  onDoubleClick={() => router.push("/dashboard/operator/cameras/laptop")}
+                  className="w-full rounded-2xl border border-blue-200 bg-white p-4 text-left text-slate-900 shadow-sm cursor-pointer"
+                  title="Double-click to open live monitoring"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-base font-semibold text-slate-900">Laptop Camera</p>
+                      <p className="mt-1 flex items-center gap-1 truncate text-sm text-slate-500">
+                        <MapPin className="h-3.5 w-3.5" />
+                        Local device feed
+                      </p>
+                    </div>
+                    <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide ${
+                      laptopCameraEnabled
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-slate-100 text-slate-600"
+                    }`}>
+                      {laptopCameraEnabled ? "active" : "idle"}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-slate-100">
+                    {laptopCameraEnabled ? (
+                      <video
+                        ref={laptopVideoRef}
+                        autoPlay
+                        muted
+                        playsInline
+                        className="h-40 w-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-40 items-center justify-center px-4 text-center text-xs text-slate-500">
+                        Start laptop camera to view local preview
+                      </div>
+                    )}
+                  </div>
+
+                  {laptopCameraError && (
+                    <p className="mt-2 text-xs text-rose-700">{laptopCameraError}</p>
+                  )}
+
+                  <div className="mt-3 flex items-center justify-between gap-2 text-xs">
+                    <div className="flex gap-2">
+                      {!laptopCameraEnabled ? (
+                        <button
+                          onClick={startLaptopCamera}
+                          className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          Start Camera
+                        </button>
+                      ) : (
+                        <button
+                          onClick={stopLaptopCamera}
+                          className="rounded-lg border border-slate-300 px-3 py-1.5 font-medium text-slate-700 hover:bg-slate-50"
+                        >
+                          Stop Camera
+                        </button>
+                      )}
+                    </div>
+
+                    <button
+                      onClick={() => router.push("/detect-image")}
+                      className="inline-flex items-center gap-1 text-slate-500 hover:text-slate-700"
+                    >
+                      Open analysis <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  <p className="mt-2 text-[11px] text-slate-500">
+                    Double-click this card to open laptop live monitoring.
+                  </p>
+                </div>
+
                 {filteredCameras.map((camera) => {
                   const status = getCameraStatus(camera);
 
@@ -335,6 +456,12 @@ export default function OperatorCamerasPage() {
                   );
                 })}
               </div>
+
+              {filteredCameras.length === 0 && (
+                <div className="rounded-2xl border border-slate-200 bg-white p-6 text-center text-slate-500 shadow-sm">
+                  No assigned cameras match this search.
+                </div>
+              )}
             </div>
           )}
         </div>

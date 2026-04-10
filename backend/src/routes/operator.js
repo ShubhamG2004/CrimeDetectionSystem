@@ -892,7 +892,7 @@ router.post("/assign-esp32", verifyToken, async (req, res) => {
       esp32Ip,
       streamPath = "/stream",
       capturePath = "/capture",
-      uploadIntervalSec = 10,
+      uploadIntervalSec = 5,
     } = req.body || {};
 
     if (!cameraId || !esp32Ip) {
@@ -944,7 +944,7 @@ router.post("/assign-esp32", verifyToken, async (req, res) => {
     const numericInterval = Number(uploadIntervalSec);
     const intervalSec = Number.isFinite(numericInterval)
       ? Math.max(2, Math.min(120, Math.floor(numericInterval)))
-      : 10;
+      : 5;
 
     const existingToken = cameraData?.esp32?.deviceToken || cameraData?.deviceToken;
     const deviceToken = existingToken || crypto.randomBytes(24).toString("hex");

@@ -32,7 +32,7 @@ export default function ConnectEsp32Page() {
     esp32Ip: "",
     streamPath: "/stream",
     capturePath: "/capture",
-    uploadIntervalSec: "10",
+    uploadIntervalSec: "5",
   });
 
   useEffect(() => {

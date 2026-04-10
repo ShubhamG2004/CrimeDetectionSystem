@@ -125,7 +125,7 @@ exports.createIncident = async (req, res) => {
 
     if (shouldTriggerAlert({
       threat_level: incidentData.threat_level,
-      threat_score: incidentData.threat_score,
+      crime_type: incidentData.crime_type,
     })) {
       try {
         await triggerStationAlert({

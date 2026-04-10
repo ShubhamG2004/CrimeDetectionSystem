@@ -271,34 +271,6 @@ export default function ImageDetectionPage() {
       rawCrimeType.toLowerCase() === "normal" ||
       rawCrimeType.toLowerCase().startsWith("normal");
 
-    const hasAssaultEvidence =
-      activities.includes("physical_assault") ||
-      activities.includes("kicking_motion") ||
-      activities.includes("stabbing_attack") ||
-      activities.includes("shooting_threat") ||
-      activities.includes("threatening_gesture") ||
-      signals.includes("dominant_over_fallen") ||
-      signals.includes("fallen") ||
-      signals.includes("direct_assault") ||
-      signals.includes("grab_neck") ||
-      signals.includes("restraining_hold") ||
-      signals.includes("weapon_threat") ||
-      signals.includes("gun_aiming");
-
-    // Highest priority: visible assault/violence cues should never be shown as normal.
-    if (hasAssaultEvidence) {
-      if (signals.includes("dominant_over_fallen") || signals.includes("fallen")) {
-        return "Possible Assault (Person Down)";
-      }
-      if (activities.includes("shooting_threat") || signals.includes("gun_aiming")) {
-        return "Armed Threat";
-      }
-      if (activities.includes("stabbing_attack") || signals.includes("weapon_threat")) {
-        return "Violent Attack";
-      }
-      return "Suspicious Activity";
-    }
-
     if (
       activities.includes("cutting") ||
       activities.includes("working") ||
@@ -306,11 +278,7 @@ export default function ImageDetectionPage() {
       signals.includes("tool") ||
       (signals.includes("knife") && !signals.includes("attack"))
     ) {
-      const isLowRisk = threatLevel === "LOW" || threatLevel === "NORMAL" || threatScore < 30;
-      if (isLowRisk) {
-        return "Normal Activity (Tool Usage)";
-      }
-      return "Suspicious Activity";
+      return "Normal Activity (Tool Usage)";
     }
 
     if (signals.includes("gun") || signals.includes("shoot")) {

@@ -11,7 +11,7 @@ const ALERT_STATUS = {
   RESOLVED: "resolved",
 };
 const HIGH_RISK_LEVELS = new Set(["HIGH", "CRITICAL"]);
-const SCORE_THRESHOLD = Number(process.env.ALERT_SCORE_THRESHOLD || 70);
+const EXCLUDED_CRIME_TYPES = new Set(["SUSPICIOUS_ACTIVITY", "SUSPICIOUS"]);
 
 const TWILIO_CHANNEL = (process.env.TWILIO_CHANNEL || "whatsapp").toLowerCase();
 const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
@@ -48,12 +48,18 @@ const mailTransport = hasMailConfig
     })
   : null;
 
-const shouldTriggerAlert = ({ threat_level = "LOW", threat_score = 0 }) => {
+const shouldTriggerAlert = ({ threat_level = "LOW", crime_type = "" }) => {
   const normalizedLevel = String(threat_level).toUpperCase();
-  if (HIGH_RISK_LEVELS.has(normalizedLevel)) {
-    return true;
+  const normalizedCrimeType = String(crime_type)
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+
+  if (EXCLUDED_CRIME_TYPES.has(normalizedCrimeType)) {
+    return false;
   }
-  return Number(threat_score) >= SCORE_THRESHOLD;
+
+  return HIGH_RISK_LEVELS.has(normalizedLevel);
 };
 
 const buildCameraMeta = ({ cameraId, cameraData = {}, location = {} }) => ({
