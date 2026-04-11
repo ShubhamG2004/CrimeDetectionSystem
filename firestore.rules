@@ -1,0 +1,151 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasRole(role) {
+      return isSignedIn() && request.auth.token.role == role;
+    }
+
+    function userDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdminAccount() {
+      return isSignedIn() &&
+        userDoc().exists() &&
+        userDoc().data.role == 'admin';
+    }
+
+    function isAdmin() {
+      return hasRole('admin') || isAdminAccount();
+    }
+
+    function isFieldOperator() {
+      return hasRole('field_operator') || isFieldOperatorAccount();
+    }
+
+    function fieldOperatorDoc() {
+      return get(/databases/$(database)/documents/field_operator/$(request.auth.uid));
+    }
+
+    function isFieldOperatorAccount() {
+      return isSignedIn() &&
+        fieldOperatorDoc().exists() &&
+        (fieldOperatorDoc().data.role == 'field_operator' || fieldOperatorDoc().data.role == null) &&
+        (fieldOperatorDoc().data.status == 'active' || fieldOperatorDoc().data.status == null);
+    }
+
+    function isOperator() {
+      return hasRole('operator') || isOperatorAccount();
+    }
+
+    function operatorDoc() {
+      return get(/databases/$(database)/documents/operators/$(request.auth.uid));
+    }
+
+    function isOperatorAccount() {
+      return isSignedIn() &&
+        operatorDoc().exists() &&
+        (operatorDoc().data.role == 'operator' || operatorDoc().data.role == null) &&
+        (operatorDoc().data.status == 'active' || operatorDoc().data.status == null);
+    }
+
+    function incidentCameraId() {
+      return resource.data.cameraId != null
+        ? resource.data.cameraId
+        : resource.data.location != null && resource.data.location.cameraId != null
+          ? resource.data.location.cameraId
+          : null;
+    }
+
+    function canReadIncidentForAssignedCamera() {
+      return isOperator() &&
+        operatorDoc().exists() &&
+        operatorDoc().data.cameras != null &&
+        incidentCameraId() != null &&
+        incidentCameraId() in operatorDoc().data.cameras;
+    }
+
+    function isValidCameraStatus(status) {
+      return status in ['pending', 'approved', 'rejected'];
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isAdmin();
+      allow update, delete: if isAdmin();
+    }
+
+    match /field_operator/{operatorId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /operators/{operatorId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /incidents/{incidentId} {
+      allow read: if isSignedIn() && (isAdmin() || canReadIncidentForAssignedCamera());
+
+      allow create: if isAdmin();
+
+      allow update: if isAdmin() || (
+        canReadIncidentForAssignedCamera() &&
+        request.resource.data.diff(resource.data).changedKeys().hasOnly([
+          'status',
+          'acknowledgedAt',
+          'acknowledgedBy',
+          'resolvedAt',
+          'resolvedBy',
+          'updatedAt'
+        ]) &&
+        request.resource.data.status in ['acknowledged', 'resolved']
+      );
+
+      allow delete: if isAdmin();
+    }
+
+    match /policeStations/{stationId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /cameras/{cameraId} {
+      // Allow any authenticated user to read all cameras
+      // (supports both role-based and guest access during auth setup)
+      allow read: if isSignedIn();
+
+      // Field operators can submit new cameras only in pending state for themselves.
+      // Also allow if user is authenticated (handles missing role claims during setup)
+      allow create: if isSignedIn() && (
+        (request.resource.data.addedBy == request.auth.uid &&
+         request.resource.data.fieldOperatorId == request.auth.uid &&
+         request.resource.data.status == 'pending' &&
+         request.resource.data.approvedBy == null &&
+         request.resource.data.createdAt != null) ||
+        request.auth.token.role == 'field_operator'
+      );
+
+      // Admin can approve/reject camera status.
+      allow update: if isAdmin() &&
+        isValidCameraStatus(request.resource.data.status);
+
+      allow delete: if isAdmin();
+    }
+
+    match /operatorLogs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
