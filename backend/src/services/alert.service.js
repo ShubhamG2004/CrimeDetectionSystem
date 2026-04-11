@@ -15,7 +15,11 @@ const EXCLUDED_CRIME_TYPES = new Set(["SUSPICIOUS_ACTIVITY", "SUSPICIOUS"]);
 
 const TWILIO_CHANNEL = (process.env.TWILIO_CHANNEL || "whatsapp").toLowerCase();
 const TWILIO_FROM_NUMBER = process.env.TWILIO_FROM_NUMBER;
+<<<<<<< HEAD
 const TWILIO_TEST_NUMBER = "+917057652014";
+=======
+const TWILIO_TEST_NUMBER = process.env.TWILIO_TEST_NUMBER || "+917057652014";
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 3 * 60 * 1000; // 3 minutes
 
@@ -154,7 +158,11 @@ const sendSmsAlert = async ({ alertDoc, stationMeta }) => {
     };
   }
 
+<<<<<<< HEAD
   const toNumber = TWILIO_TEST_NUMBER;
+=======
+  const toNumber = stationMeta?.contactNumber || TWILIO_TEST_NUMBER;
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   const formattedTo = formatTwilioAddress(toNumber);
   const formattedFrom = formatTwilioAddress(TWILIO_FROM_NUMBER);
 

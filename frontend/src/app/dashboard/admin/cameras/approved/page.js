@@ -3,13 +3,21 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
+<<<<<<< HEAD
 import { auth } from "@/lib/firebase";
+=======
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 import { ROLES } from "@/lib/roles";
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
 
+<<<<<<< HEAD
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 export default function ApprovedCamerasPage() {
   const router = useRouter();
   const checkedRef = useRef(false);
@@ -26,6 +34,7 @@ export default function ApprovedCamerasPage() {
       if (localStorage.getItem("role") !== ROLES.ADMIN) return router.replace("/dashboard");
 
       try {
+<<<<<<< HEAD
         const token = await user.getIdToken(true);
         const res = await fetch(`${API_BASE}/api/cameras`, {
           headers: {
@@ -45,14 +54,29 @@ export default function ApprovedCamerasPage() {
               ...camera,
             }))
             .filter((camera) => (camera.status || "pending") === "approved")
+=======
+        const snap = await getDocs(
+          query(collection(db, "cameras"), where("status", "==", "approved"))
+        );
+
+        setCameras(
+          snap.docs
+            .map((docSnap) => ({
+              id: docSnap.id,
+              ...docSnap.data(),
+            }))
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
             .sort((a, b) => {
               const aMs = a.approvedAt?.toMillis?.() || 0;
               const bMs = b.approvedAt?.toMillis?.() || 0;
               return bMs - aMs;
             })
         );
+<<<<<<< HEAD
       } catch (error) {
         console.error("Failed to load approved cameras:", error);
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       } finally {
         setLoading(false);
       }

@@ -3,7 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+<<<<<<< HEAD
     "dev": "next dev --webpack",
+=======
+    "dev": "next dev",
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
     "build": "next build",
     "start": "next start"
   },

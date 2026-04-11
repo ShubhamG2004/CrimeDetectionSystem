@@ -3,7 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+<<<<<<< HEAD
 import { AlertTriangle, Image, Map, Shield, CheckCircle, UserCircle2, Camera, MessageSquare } from "lucide-react";
+=======
+import { AlertTriangle, Image, Map, Shield, CheckCircle, UserCircle2, Camera } from "lucide-react";
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 import LogoutButton from "./LogoutButton";
 
 export default function OperatorSidebar() {
@@ -119,6 +123,7 @@ export default function OperatorSidebar() {
             <span className={labelClass(isActive("/dashboard/operator/profile"))}>Profile</span>
           </Link>
 
+<<<<<<< HEAD
           <Link
             href="/dashboard/operator/messages"
             onClick={handleClose}
@@ -128,6 +133,8 @@ export default function OperatorSidebar() {
             <span className={labelClass(isActive("/dashboard/operator/messages"))}>Messages</span>
           </Link>
 
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
           <div className="pt-4 mt-4 border-t border-slate-100">
             <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 border border-slate-200">
               <Shield className="h-5 w-5 text-slate-500" />

@@ -8,7 +8,11 @@ export default function Navbar({ title }) {
   };
 
   return (
+<<<<<<< HEAD
     <div className="sticky top-0 z-30 flex h-16 items-center justify-between gap-4 px-6 bg-white/95 text-slate-900 border-b border-gray-200 shadow-[0_6px_16px_rgba(0,0,0,0.04)] backdrop-blur-sm">
+=======
+    <div className="flex h-16 items-center justify-between gap-4 px-6 bg-white text-slate-900 border-b border-gray-200 shadow-[0_6px_16px_rgba(0,0,0,0.04)]">
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       <div className="flex items-center gap-3 min-w-0">
         <button
           type="button"

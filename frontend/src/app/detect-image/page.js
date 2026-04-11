@@ -259,6 +259,7 @@ export default function ImageDetectionPage() {
     }
   };
 
+<<<<<<< HEAD
   const formatThreatScore = (value) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return "0";
@@ -268,6 +269,8 @@ export default function ImageDetectionPage() {
     return Number(clamped.toFixed(2)).toString();
   };
 
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   /* ================= GET CRIME TYPE DISPLAY ================= */
   const getCrimeTypeDisplay = (data) => {
     const activities = (data.activities || []).join(" ").toLowerCase();
@@ -528,7 +531,11 @@ export default function ImageDetectionPage() {
                   <div className="bg-slate-50 p-4 rounded-lg">
                     <div className="text-sm text-slate-500">Threat Score</div>
                     <div className="text-2xl font-bold text-slate-800">
+<<<<<<< HEAD
                       {formatThreatScore(result.threat_score)}/100
+=======
+                      {result.threat_score || 0}/100
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                     </div>
                   </div>
                 </div>

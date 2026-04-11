@@ -1,10 +1,17 @@
 ﻿"use client";
 
+<<<<<<< HEAD
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import dynamic from "next/dynamic";
 import { Building2, MapPin, Phone, Mail, X } from "lucide-react";
+=======
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
+import dynamic from "next/dynamic";
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 import { auth } from "@/lib/firebase";
 import { ROLES } from "@/lib/roles";
 import Navbar from "@/components/Navbar";
@@ -40,8 +47,11 @@ export default function PoliceStationsPage() {
   const [form, setForm] = useState(emptyForm);
   const [pinLocation, setPinLocation] = useState(null); // { lat, lng }
   const [saving, setSaving] = useState(false);
+<<<<<<< HEAD
   const [selectedStation, setSelectedStation] = useState(null);
   const [search, setSearch] = useState("");
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 
   /* AUTH GUARD */
   useEffect(() => {
@@ -180,6 +190,7 @@ export default function PoliceStationsPage() {
     />
   );
 
+<<<<<<< HEAD
   const getTimestampMs = (value) => {
     if (!value) return null;
     if (typeof value?.toMillis === "function") return value.toMillis();
@@ -234,6 +245,8 @@ export default function PoliceStationsPage() {
     };
   }, [stations]);
 
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   /* RENDER */
   return (
     <div className="app-shell flex">
@@ -254,9 +267,12 @@ export default function PoliceStationsPage() {
                 Registered stations receive alerts based on proximity to
                 crime location.
               </p>
+<<<<<<< HEAD
               <p className="text-xs text-slate-400 mt-1">
                 Double-click any row to view full station details.
               </p>
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
             </div>
             <button
               onClick={() => {
@@ -270,6 +286,7 @@ export default function PoliceStationsPage() {
             </button>
           </div>
 
+<<<<<<< HEAD
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-5">
             <div className="app-card p-4 border-l-4 border-slate-800">
               <p className="text-xs text-slate-500">Total Stations</p>
@@ -295,6 +312,8 @@ export default function PoliceStationsPage() {
             />
           </div>
 
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
           {/* TABLE */}
           <div className="overflow-x-auto app-card">
             <table className="w-full">
@@ -311,11 +330,18 @@ export default function PoliceStationsPage() {
               </thead>
 
               <tbody className="text-slate-800 text-sm">
+<<<<<<< HEAD
                 {filteredStations.map((s) => (
                   <tr
                     key={s.id}
                     onDoubleClick={() => setSelectedStation(s)}
                     className="border-t border-slate-100 hover:bg-slate-50/70 cursor-pointer transition-colors"
+=======
+                {stations.map((s) => (
+                  <tr
+                    key={s.id}
+                    className="border-t border-slate-100 hover:bg-slate-50/70"
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                   >
                     <td className="p-3 font-medium">{s.stationName}</td>
                     <td className="p-3 text-slate-500">
@@ -350,6 +376,7 @@ export default function PoliceStationsPage() {
                         ? s.jurisdictionRadius
                         : "-"}
                     </td>
+<<<<<<< HEAD
                     <td
                       className="p-3 text-center space-x-2"
                       onDoubleClick={(event) => event.stopPropagation()}
@@ -359,15 +386,24 @@ export default function PoliceStationsPage() {
                           event.stopPropagation();
                           openEdit(s);
                         }}
+=======
+                    <td className="p-3 text-center space-x-2">
+                      <button
+                        onClick={() => openEdit(s)}
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                         className="px-3 py-1 bg-slate-900 hover:bg-slate-800 text-white text-xs rounded"
                       >
                         Edit
                       </button>
                       <button
+<<<<<<< HEAD
                         onClick={(event) => {
                           event.stopPropagation();
                           deleteStation(s.id, s.stationName);
                         }}
+=======
+                        onClick={() => deleteStation(s.id, s.stationName)}
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                         className="px-3 py-1 bg-orange-600 hover:bg-orange-700 text-white text-xs rounded"
                       >
                         Delete
@@ -378,11 +414,18 @@ export default function PoliceStationsPage() {
               </tbody>
             </table>
 
+<<<<<<< HEAD
             {!loading && filteredStations.length === 0 && (
               <p className="p-8 text-center text-slate-500">
                 {search.trim()
                   ? "No stations matched your search."
                   : "No police stations registered yet. Add one to enable alert routing."}
+=======
+            {!loading && stations.length === 0 && (
+              <p className="p-8 text-center text-slate-500">
+                No police stations registered yet. Add one to enable alert
+                routing.
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
               </p>
             )}
 
@@ -543,6 +586,7 @@ export default function PoliceStationsPage() {
             </div>
           </div>
         )}
+<<<<<<< HEAD
 
         {/* DETAILS MODAL */}
         {selectedStation && (
@@ -648,6 +692,8 @@ export default function PoliceStationsPage() {
             </div>
           </div>
         )}
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       </div>
     </div>
   );

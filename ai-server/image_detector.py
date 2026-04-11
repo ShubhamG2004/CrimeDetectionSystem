@@ -211,9 +211,12 @@ def detect_image():
         location = request.form.get("location", "Unknown")
         camera_id = request.form.get("camera_id", "Unknown")
         timestamp = request.form.get("timestamp", datetime.now().isoformat())
+<<<<<<< HEAD
         invert_image = str(request.form.get("invert_image", "false")).strip().lower() in {
             "1", "true", "yes", "on"
         }
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
         
         if file.filename == "":
             return jsonify({
@@ -248,10 +251,13 @@ def detect_image():
                 "message": "Could not read image file",
                 "response_time_ms": calculate_response_time(start_time)
             }), 400
+<<<<<<< HEAD
 
         if invert_image:
             image = cv2.rotate(image, cv2.ROTATE_180)
             cv2.imwrite(filepath, image)
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
         
         # Run detection
         detection = analyze_image(image)

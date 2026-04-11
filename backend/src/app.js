@@ -8,8 +8,11 @@ const cameraRoutes = require("./routes/camera.routes");
 const adminRoutes = require("./routes/admin.routes");
 const detectRoutes = require("./routes/detect.routes");
 const alertRoutes = require("./routes/alert.routes");
+<<<<<<< HEAD
 const messageRoutes = require("./routes/messages.routes");
 const analyticsRoutes = require("./routes/analytics.routes");
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 const { db } = require("./config/firebase");
 
 const app = express();
@@ -48,8 +51,11 @@ app.use("/api/admin", adminRoutes);
 app.use("/api/detect", detectRoutes);
 
 app.use("/api/alerts", alertRoutes);
+<<<<<<< HEAD
 app.use("/api/messages", messageRoutes);
 app.use("/api/analytics", analyticsRoutes);
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 
 app.use("/api/incidents", require("./routes/incident.routes"));
 

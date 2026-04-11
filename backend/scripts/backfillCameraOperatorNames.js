@@ -1,15 +1,22 @@
 const admin = require("firebase-admin");
 const path = require("path");
 
+<<<<<<< HEAD
 const serviceAccountPath = process.env.FIREBASE_SERVICE_ACCOUNT_PATH
   ? path.resolve(process.cwd(), process.env.FIREBASE_SERVICE_ACCOUNT_PATH)
   : path.join(__dirname, "..", "firebase-admin.json");
+=======
+const serviceAccountPath = path.join(__dirname, "..", "firebase-admin.json");
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 const serviceAccount = require(serviceAccountPath);
 
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
+<<<<<<< HEAD
     projectId: process.env.FIREBASE_PROJECT_ID || serviceAccount.project_id,
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   });
 }
 

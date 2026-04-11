@@ -1,18 +1,36 @@
 ﻿"use client";
 
+<<<<<<< HEAD
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { ROLES } from "@/lib/roles";
 import { Shield, UserPlus, KeyRound, Camera, X, User } from "lucide-react";
+=======
+import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth, db } from "@/lib/firebase";
+import { ROLES } from "@/lib/roles";
+import {
+  collection,
+  getDocs,
+  updateDoc,
+  doc,
+} from "firebase/firestore";
+import { Shield, UserPlus, KeyRound, Camera } from "lucide-react";
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
 
+<<<<<<< HEAD
 const OPERATORS_PAGE_CACHE_KEY = "admin_operators_page_cache_v1";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 export default function ManageOperators() {
   const router = useRouter();
   const checkedRef = useRef(false);
@@ -25,16 +43,22 @@ export default function ManageOperators() {
   const [editingUid, setEditingUid] = useState(null);
   const [resetUid, setResetUid] = useState(null);
   const [newPassword, setNewPassword] = useState("");
+<<<<<<< HEAD
   const [selectedOperator, setSelectedOperator] = useState(null);
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 
   const [search, setSearch] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+<<<<<<< HEAD
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [savingOperator, setSavingOperator] = useState(false);
   const [updatingStatusUid, setUpdatingStatusUid] = useState("");
   const [resettingPassword, setResettingPassword] = useState(false);
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 
   const emptyForm = {
     email: "",
@@ -44,6 +68,7 @@ export default function ManageOperators() {
 
   const [form, setForm] = useState(emptyForm);
 
+<<<<<<< HEAD
   const readCachedData = () => {
     if (typeof window === "undefined") return null;
 
@@ -76,6 +101,8 @@ export default function ManageOperators() {
     }
   };
 
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   /* ================= MOUNTED STATE ================= */
   useEffect(() => {
     setMounted(true);
@@ -86,7 +113,11 @@ export default function ManageOperators() {
     if (checkedRef.current) return;
     checkedRef.current = true;
 
+<<<<<<< HEAD
     const bootstrap = async (user) => {
+=======
+    const unsub = onAuthStateChanged(auth, async (user) => {
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       if (!user) {
         router.replace("/login");
         return;
@@ -100,6 +131,7 @@ export default function ManageOperators() {
         return;
       }
 
+<<<<<<< HEAD
       const cached = readCachedData();
       if (cached) {
         setOperators(cached.operators);
@@ -123,6 +155,10 @@ export default function ManageOperators() {
 
     const unsub = onAuthStateChanged(auth, async (user) => {
       await bootstrap(user);
+=======
+      fetchOperators();
+      fetchCameras();
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
     });
 
     return () => unsub();
@@ -143,6 +179,7 @@ export default function ManageOperators() {
   }, []);
 
   /* ================= FETCH OPERATORS ================= */
+<<<<<<< HEAD
   const fetchOperatorsAndCameras = async () => {
     if (!auth.currentUser) return;
 
@@ -178,6 +215,24 @@ export default function ManageOperators() {
     setOperators(nextOperators);
     setCameras(nextCameras);
     writeCachedData(nextOperators, nextCameras);
+=======
+  const fetchOperators = async () => {
+    const snap = await getDocs(collection(db, "operators"));
+    setOperators(
+      snap.docs.map((d) => ({ uid: d.id, ...d.data() }))
+    );
+  };
+
+  /* ================= FETCH CAMERAS ================= */
+  const fetchCameras = async () => {
+    const snap = await getDocs(collection(db, "cameras"));
+    setCameras(
+      snap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }))
+    );
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   };
 
   /* ================= ADD OPERATOR ================= */
@@ -187,6 +242,7 @@ export default function ManageOperators() {
       return;
     }
 
+<<<<<<< HEAD
     try {
       setSavingOperator(true);
       const token = await auth.currentUser.getIdToken();
@@ -217,6 +273,27 @@ export default function ManageOperators() {
     } finally {
       setSavingOperator(false);
     }
+=======
+    const token = await auth.currentUser.getIdToken();
+
+    const res = await fetch(
+      "http://localhost:5000/api/admin/create-operator",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(form),
+      }
+    );
+
+    const data = await res.json();
+    if (!res.ok) return alert(data.message);
+
+    closeModal();
+    fetchOperators();
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   };
 
   /* ================= EDIT OPERATOR ================= */
@@ -236,6 +313,7 @@ export default function ManageOperators() {
       return;
     }
 
+<<<<<<< HEAD
     try {
       setSavingOperator(true);
       const token = await auth.currentUser.getIdToken(true);
@@ -264,10 +342,20 @@ export default function ManageOperators() {
     } finally {
       setSavingOperator(false);
     }
+=======
+    await updateDoc(doc(db, "operators", editingUid), {
+      cameras: form.cameras,
+      updatedAt: new Date(),
+    });
+
+    closeModal();
+    fetchOperators();
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   };
 
   /* ================= TOGGLE STATUS ================= */
   const toggleStatus = async (uid, status) => {
+<<<<<<< HEAD
     try {
       setUpdatingStatusUid(uid);
       const token = await auth.currentUser.getIdToken(true);
@@ -317,6 +405,12 @@ export default function ManageOperators() {
       hour: "2-digit",
       minute: "2-digit",
     });
+=======
+    await updateDoc(doc(db, "operators", uid), {
+      status: status === "active" ? "inactive" : "active",
+    });
+    fetchOperators();
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   };
 
   /* ================= RESET PASSWORD ================= */
@@ -326,6 +420,7 @@ export default function ManageOperators() {
       return;
     }
 
+<<<<<<< HEAD
     try {
       setResettingPassword(true);
       const token = await auth.currentUser.getIdToken();
@@ -362,6 +457,36 @@ export default function ManageOperators() {
     } finally {
       setResettingPassword(false);
     }
+=======
+    const token = await auth.currentUser.getIdToken();
+
+    const res = await fetch(
+      "http://localhost:5000/api/admin/reset-operator-password",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          uid: resetUid,
+          newPassword,
+        }),
+      }
+    );
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      alert(data.message);
+      return;
+    }
+
+    alert("Password reset successfully");
+
+    setResetUid(null);
+    setNewPassword("");
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   };
 
   const closeModal = () => {
@@ -373,6 +498,7 @@ export default function ManageOperators() {
   };
 
   /* ================= CAMERA NAME MAP ================= */
+<<<<<<< HEAD
   const cameraMap = useMemo(
     () =>
       cameras.reduce((acc, cam) => {
@@ -391,6 +517,17 @@ export default function ManageOperators() {
         return name.includes(q) || area.includes(q);
       }),
     [cameras, search]
+=======
+  const cameraMap = cameras.reduce((acc, cam) => {
+    acc[cam.id] = cam.name;
+    return acc;
+  }, {});
+
+  const filteredCameras = cameras.filter(
+    (cam) =>
+      cam.name.toLowerCase().includes(search.toLowerCase()) ||
+      cam.area.toLowerCase().includes(search.toLowerCase())
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   );
 
   return (
@@ -411,9 +548,12 @@ export default function ManageOperators() {
               <h2 className="text-2xl font-semibold text-slate-900 mt-2">
                 Operators
               </h2>
+<<<<<<< HEAD
               <p className="text-sm text-slate-500 mt-1">
                 Double-click an operator row to open full details.
               </p>
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
             </div>
             <button
               onClick={() => setShowModal(true)}
@@ -426,6 +566,7 @@ export default function ManageOperators() {
 
           {/* TABLE */}
           <div className="overflow-x-auto app-card">
+<<<<<<< HEAD
             {loading && (
               <div className="p-4 border-b border-slate-200 text-sm text-slate-500">
                 Refreshing operators...
@@ -436,6 +577,8 @@ export default function ManageOperators() {
                 {pageError}
               </div>
             )}
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
             <table className="w-full">
               <thead className="bg-slate-100 border-b border-slate-200">
                 <tr>
@@ -449,6 +592,7 @@ export default function ManageOperators() {
 
               <tbody className="text-slate-800">
                 {operators.map((op) => (
+<<<<<<< HEAD
                   <tr
                     key={op.uid}
                     onDoubleClick={() => setSelectedOperator(op)}
@@ -460,13 +604,28 @@ export default function ManageOperators() {
                       <ul className="space-y-1.5">
                         {(op.cameras || []).map((id) => (
                           <li
+=======
+                  <tr key={op.uid} className="border-t border-slate-100 hover:bg-slate-50/70 transition duration-150">
+                    <td className="p-4">{op.email}</td>
+
+                    <td className="p-4">
+                      <div className="flex flex-wrap gap-1.5">
+                        {op.cameras?.map((id) => (
+                          <span
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                             key={id}
                             className="px-2.5 py-1 bg-orange-50 text-orange-700 rounded-md text-xs font-medium"
                           >
                             {cameraMap[id] || id}
+<<<<<<< HEAD
                           </li>
                         ))}
                       </ul>
+=======
+                          </span>
+                        ))}
+                      </div>
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                     </td>
 
                     <td className="p-4 text-center">
@@ -474,7 +633,11 @@ export default function ManageOperators() {
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
                           op.status === "active"
                             ? "bg-orange-100 text-orange-800"
+<<<<<<< HEAD
                             : "bg-rose-100 text-rose-700"
+=======
+                            : "bg-slate-200 text-slate-700"
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                         }`}
                       >
                         {op.status}
@@ -482,14 +645,22 @@ export default function ManageOperators() {
                     </td>
 
                     <td className="p-4 text-center text-gray-600">
+<<<<<<< HEAD
                       {(() => {
                         const createdAtMs = getCreatedAtMs(op.createdAt);
                         return mounted && createdAtMs
                           ? new Date(createdAtMs).toLocaleDateString([], {
+=======
+                      {mounted && op.createdAt
+                        ? new Date(
+                            op.createdAt.seconds * 1000
+                          ).toLocaleDateString([], {
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                             year: "numeric",
                             month: "short",
                             day: "numeric"
                           })
+<<<<<<< HEAD
                           : "-";
                       })()}
                     </td>
@@ -503,14 +674,26 @@ export default function ManageOperators() {
                           event.stopPropagation();
                           editOperator(op);
                         }}
+=======
+                        : "-"}
+                    </td>
+
+                    <td className="p-3 text-center space-x-2">
+                      <button
+                        onClick={() => editOperator(op)}
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                         className="px-3 py-1.5 bg-slate-900 text-white text-xs rounded-md font-medium hover:bg-black transition"
                       >
                         Edit
                       </button>
 
                       <button
+<<<<<<< HEAD
                         onClick={(event) => {
                           event.stopPropagation();
+=======
+                        onClick={() => {
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                           setResetUid(op.uid);
                           setNewPassword("");
                         }}
@@ -520,15 +703,20 @@ export default function ManageOperators() {
                       </button>
 
                       <button
+<<<<<<< HEAD
                         onClick={(event) => {
                           event.stopPropagation();
                           toggleStatus(op.uid, op.status);
                         }}
                         disabled={updatingStatusUid === op.uid}
+=======
+                        onClick={() => toggleStatus(op.uid, op.status)}
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                         className={`px-3 py-1.5 text-white text-xs rounded-md font-medium transition ${
                           op.status === "active"
                             ? "bg-orange-600 hover:bg-orange-700"
                             : "bg-orange-600 hover:bg-orange-700"
+<<<<<<< HEAD
                         } disabled:opacity-60 disabled:cursor-not-allowed`}
                       >
                         {updatingStatusUid === op.uid
@@ -536,6 +724,11 @@ export default function ManageOperators() {
                           : op.status === "active"
                             ? "Disable"
                             : "Enable"}
+=======
+                        }`}
+                      >
+                        {op.status === "active" ? "Disable" : "Enable"}
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                       </button>
                     </td>
                   </tr>
@@ -677,13 +870,21 @@ export default function ManageOperators() {
                         <Camera className="h-4 w-4" />
                         Selected ({form.cameras.length})
                       </p>
+<<<<<<< HEAD
                       <div className="space-y-1.5">
+=======
+                      <div className="flex flex-wrap gap-1.5">
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                         {form.cameras.map((id) => {
                           const cam = cameras.find(c => c.id === id);
                           return (
                             <span
                               key={id}
+<<<<<<< HEAD
                               className="block px-2.5 py-1 bg-slate-200 text-slate-700 rounded-md text-xs font-medium"
+=======
+                              className="px-2.5 py-1 bg-slate-200 text-slate-700 rounded-md text-xs font-medium"
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                             >
                               {cam?.name || id}
                             </span>
@@ -707,10 +908,16 @@ export default function ManageOperators() {
                   onClick={
                     editingUid ? updateOperator : addOperator
                   }
+<<<<<<< HEAD
                   disabled={savingOperator}
                   className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-black"
                 >
                   {savingOperator ? "Saving..." : "Save Changes"}
+=======
+                  className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-black"
+                >
+                  Save Changes
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                 </button>
               </div>
               </div>
@@ -754,16 +961,23 @@ export default function ManageOperators() {
                 </button>
                 <button
                   onClick={resetPassword}
+<<<<<<< HEAD
                   disabled={resettingPassword}
                   className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
                 >
                   {resettingPassword ? "Resetting..." : "Reset"}
+=======
+                  className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
+                >
+                  Reset
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                 </button>
               </div>
               </div>
             </div>
           </div>
         )}
+<<<<<<< HEAD
 
         {/* OPERATOR DETAILS MODAL */}
         {selectedOperator && (
@@ -862,6 +1076,8 @@ export default function ManageOperators() {
             </div>
           </div>
         )}
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       </div>
     </div>
   );

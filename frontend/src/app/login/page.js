@@ -74,6 +74,7 @@ export default function Login() {
       let profileReadBlocked = false;
 
       if (role === ROLES.OPERATOR) {
+<<<<<<< HEAD
         try {
           profileSnap = await getDoc(doc(db, "operators", uid));
         } catch (operatorProfileErr) {
@@ -83,6 +84,9 @@ export default function Login() {
             throw operatorProfileErr;
           }
         }
+=======
+        profileSnap = await getDoc(doc(db, "operators", uid));
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       } else if (role === ROLES.FIELD_OPERATOR) {
         let usedFallback = false;
 
@@ -111,6 +115,7 @@ export default function Login() {
           profileSnap = await getDoc(doc(db, "users", uid));
         }
       } else {
+<<<<<<< HEAD
         try {
           profileSnap = await getDoc(doc(db, "users", uid));
         } catch (adminProfileErr) {
@@ -120,6 +125,9 @@ export default function Login() {
             throw adminProfileErr;
           }
         }
+=======
+        profileSnap = await getDoc(doc(db, "users", uid));
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       }
 
       if (!profileReadBlocked && !profileSnap?.exists()) {

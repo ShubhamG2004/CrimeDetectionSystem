@@ -369,8 +369,11 @@ router.post("/esp32-image", upload.single("image"), async (req, res) => {
       filename: req.file.originalname,
       contentType: req.file.mimetype,
     });
+<<<<<<< HEAD
     // ESP32 camera feed is mounted upside-down in this deployment.
     formData.append("invert_image", "true");
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 
     const aiRes = await axios.post("http://127.0.0.1:8000/detect-image", formData, {
       headers: formData.getHeaders(),
@@ -406,12 +409,15 @@ router.post("/esp32-image", upload.single("image"), async (req, res) => {
     const uploadRes = await cloudinary.uploader.upload(imageBase64, {
       folder: "crime-detection/incidents",
     });
+<<<<<<< HEAD
     const invertedImageUrl = uploadRes?.public_id
       ? cloudinary.url(uploadRes.public_id, {
           secure: true,
           transformation: [{ angle: 180 }],
         })
       : null;
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 
     const incidentData = {
       crime_type: finalCrimeType,
@@ -424,7 +430,11 @@ router.post("/esp32-image", upload.single("image"), async (req, res) => {
       signals: finalSignals,
       crime_detected: finalCrimeDetected,
       location,
+<<<<<<< HEAD
       imageUrl: invertedImageUrl || uploadRes.secure_url,
+=======
+      imageUrl: uploadRes.secure_url,
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       source: "esp32-image-detection",
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),

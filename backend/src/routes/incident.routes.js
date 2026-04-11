@@ -1,7 +1,10 @@
 const express = require("express");
 const router = express.Router();
+<<<<<<< HEAD
 const { db } = require("../config/firebase");
 const { verifyToken, requireAdmin } = require("../middleware/auth");
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 
 const {
   createIncident,
@@ -34,6 +37,7 @@ const {
  */
 router.post("/create", createIncident);
 
+<<<<<<< HEAD
 // List incidents for admin dashboards and monitoring pages
 router.get("/", verifyToken, requireAdmin, async (req, res) => {
   try {
@@ -50,4 +54,6 @@ router.get("/", verifyToken, requireAdmin, async (req, res) => {
   }
 });
 
+=======
+>>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 module.exports = router;
