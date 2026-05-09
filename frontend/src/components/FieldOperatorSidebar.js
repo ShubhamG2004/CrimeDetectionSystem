@@ -2,11 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-<<<<<<< HEAD
 import { Camera, ListChecks, LayoutDashboard, Shield, UserCircle2, Wifi, MessageSquare } from "lucide-react";
-=======
-import { Camera, ListChecks, LayoutDashboard, Shield, UserCircle2, Wifi } from "lucide-react";
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 import LogoutButton from "./LogoutButton";
 
 export default function FieldOperatorSidebar() {
@@ -80,7 +76,6 @@ export default function FieldOperatorSidebar() {
             <UserCircle2 className={iconClass(isActive("/field-operator/profile"))} />
             <span className={labelClass(isActive("/field-operator/profile"))}>Profile</span>
           </Link>
-<<<<<<< HEAD
 
           <Link
             href="/field-operator/messages"
@@ -89,8 +84,6 @@ export default function FieldOperatorSidebar() {
             <MessageSquare className={iconClass(isActive("/field-operator/messages"))} />
             <span className={labelClass(isActive("/field-operator/messages"))}>Messages</span>
           </Link>
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
         </nav>
       </div>
 

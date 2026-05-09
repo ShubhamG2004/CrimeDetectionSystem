@@ -4,6 +4,7 @@ const axios = require("axios");
 const FormData = require("form-data");
 const os = require("os");
 const router = express.Router();
+const aiServerBaseUrl = process.env.AI_SERVER_URL || "http://127.0.0.1:8000";
 const { admin } = require("../config/firebase");
 const { verifyToken } = require("../middleware/auth");
 const cache = require("../config/cache");
@@ -623,7 +624,7 @@ router.post("/capture-detect/:cameraId", verifyToken, async (req, res) => {
     let aiError = null;
 
     try {
-      const aiRes = await axios.post("http://127.0.0.1:8000/detect-image", formData, {
+      const aiRes = await axios.post(`${aiServerBaseUrl}/detect-image`, formData, {
         headers: formData.getHeaders(),
         timeout: 30000,
       });

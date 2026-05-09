@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import OperatorSidebar from "@/components/OperatorSidebar";
 import { auth } from "@/lib/firebase";
+import { API_BASE_URL } from "@/lib/config";
 import { ROLES } from "@/lib/roles";
 import { onAuthStateChanged } from "firebase/auth";
 
@@ -48,7 +49,7 @@ export default function ImageDetectionPage() {
         const token = await user.getIdToken();
 
         const res = await fetch(
-          "http://localhost:5000/api/operator/cameras",
+          `${API_BASE_URL}/api/operator/cameras`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -181,7 +182,7 @@ export default function ImageDetectionPage() {
       const token = await auth.currentUser.getIdToken();
 
       const res = await fetch(
-        "http://localhost:5000/api/detect/image",
+        `${API_BASE_URL}/api/detect/image`,
         {
           method: "POST",
           headers: {
@@ -259,7 +260,6 @@ export default function ImageDetectionPage() {
     }
   };
 
-<<<<<<< HEAD
   const formatThreatScore = (value) => {
     const numeric = Number(value);
     if (!Number.isFinite(numeric)) return "0";
@@ -269,8 +269,6 @@ export default function ImageDetectionPage() {
     return Number(clamped.toFixed(2)).toString();
   };
 
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   /* ================= GET CRIME TYPE DISPLAY ================= */
   const getCrimeTypeDisplay = (data) => {
     const activities = (data.activities || []).join(" ").toLowerCase();
@@ -531,11 +529,7 @@ export default function ImageDetectionPage() {
                   <div className="bg-slate-50 p-4 rounded-lg">
                     <div className="text-sm text-slate-500">Threat Score</div>
                     <div className="text-2xl font-bold text-slate-800">
-<<<<<<< HEAD
                       {formatThreatScore(result.threat_score)}/100
-=======
-                      {result.threat_score || 0}/100
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                     </div>
                   </div>
                 </div>

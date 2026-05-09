@@ -254,8 +254,7 @@ router.get(
 );
 
 /* ======================================================
-<<<<<<< HEAD
-   📋 LIST OPERATORS (ADMIN ONLY)
+  📋 LIST OPERATORS (ADMIN ONLY)
    ====================================================== */
 router.get(
   "/operators",
@@ -355,9 +354,7 @@ router.put(
 );
 
 /* ======================================================
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
-   🔐 RESET OPERATOR PASSWORD (ADMIN ONLY)
+  🔐 RESET OPERATOR PASSWORD (ADMIN ONLY)
    ====================================================== */
 router.post(
   "/reset-operator-password",

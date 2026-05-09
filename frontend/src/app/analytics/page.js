@@ -2,14 +2,8 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-<<<<<<< HEAD
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-=======
-import { collection, getDocs } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 import { ROLES } from "@/lib/roles";
 import dynamic from "next/dynamic";
 import Navbar from "@/components/Navbar";
@@ -27,11 +21,8 @@ export default function Analytics() {
   const [dailyData, setDailyData] = useState([]);
   const [severityData, setSeverityData] = useState([]);
   const [cameraData, setCameraData] = useState([]);
-<<<<<<< HEAD
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 
   useEffect(() => {
     // ✅ ensure auth check runs only once
@@ -54,7 +45,6 @@ export default function Analytics() {
   }, [router]);
 
   useEffect(() => {
-<<<<<<< HEAD
     const fetchAnalyticsData = async () => {
       try {
         setLoading(true);
@@ -126,80 +116,6 @@ export default function Analytics() {
     }
   }, []);
 
-=======
-    const fetchIncidents = async () => {
-      const snapshot = await getDocs(collection(db, "incidents"));
-      const incidents = snapshot.docs.map((doc) => doc.data());
-
-      processDaily(incidents);
-      processSeverity(incidents);
-      processCamera(incidents);
-    };
-
-    fetchIncidents();
-  }, []);
-
-  /* ---------- HELPERS ---------- */
-
-  const getSeverity = (confidence) => {
-    if (confidence >= 0.8) return "HIGH";
-    if (confidence >= 0.6) return "MEDIUM";
-    return "LOW";
-  };
-
-  const formatDate = (timestamp) => {
-    if (timestamp?.toDate) {
-      return timestamp.toDate().toLocaleDateString();
-    }
-    return new Date(timestamp).toLocaleDateString();
-  };
-
-  /* ---------- PROCESS DATA ---------- */
-
-  const processDaily = (incidents) => {
-    const map = {};
-    incidents.forEach((i) => {
-      const date = formatDate(i.createdAt || i.timestamp);
-      map[date] = (map[date] || 0) + 1;
-    });
-
-    setDailyData(
-      Object.keys(map).map((d) => ({
-        date: d,
-        count: map[d],
-      }))
-    );
-  };
-
-  const processSeverity = (incidents) => {
-    const counts = { HIGH: 0, MEDIUM: 0, LOW: 0 };
-    incidents.forEach((i) => {
-      counts[getSeverity(i.confidence)]++;
-    });
-
-    setSeverityData(
-      Object.keys(counts).map((k) => ({
-        name: k,
-        value: counts[k],
-      }))
-    );
-  };
-
-  const processCamera = (incidents) => {
-    const map = {};
-    incidents.forEach((i) => {
-      map[i.cameraId] = (map[i.cameraId] || 0) + 1;
-    });
-
-    setCameraData(
-      Object.keys(map).map((c) => ({
-        camera: c,
-        count: map[c],
-      }))
-    );
-  };
-
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   return (
     <div className="app-shell flex">
       <AdminSidebar />
@@ -220,7 +136,6 @@ export default function Analytics() {
             </div>
           </div>
 
-<<<<<<< HEAD
           {loading && (
             <div className="flex items-center justify-center py-12">
               <div className="text-center">
@@ -244,13 +159,6 @@ export default function Analytics() {
               cameraData={cameraData}
             />
           )}
-=======
-          <AnalyticsCharts
-            dailyData={dailyData}
-            severityData={severityData}
-            cameraData={cameraData}
-          />
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
         </div>
       </div>
     </div>

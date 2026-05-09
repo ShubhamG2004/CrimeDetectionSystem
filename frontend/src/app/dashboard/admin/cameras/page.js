@@ -1,27 +1,17 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
-<<<<<<< HEAD
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-=======
-import { useRouter } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
-import { collection, getDocs } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 import { ROLES } from "@/lib/roles";
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
 
-<<<<<<< HEAD
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 const CAMERA_OVERVIEW_CACHE_KEY = "admin_cameras_overview_cache_v1";
 
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 export default function CameraApprovalOverview() {
   const router = useRouter();
   const checkedRef = useRef(false);
@@ -29,7 +19,6 @@ export default function CameraApprovalOverview() {
   const [cameras, setCameras] = useState([]);
   const [loading, setLoading] = useState(true);
 
-<<<<<<< HEAD
   const readCachedCameras = () => {
     if (typeof window === "undefined") return null;
 
@@ -76,23 +65,16 @@ export default function CameraApprovalOverview() {
     writeCachedCameras(nextCameras);
   };
 
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   useEffect(() => {
     if (checkedRef.current) return;
     checkedRef.current = true;
 
-<<<<<<< HEAD
     const bootstrap = async (user) => {
-=======
-    const unsub = onAuthStateChanged(auth, async (user) => {
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       if (!user) return router.replace("/login");
       if (localStorage.getItem("role") !== ROLES.ADMIN) {
         return router.replace("/dashboard");
       }
 
-<<<<<<< HEAD
       const cachedCameras = readCachedCameras();
       if (cachedCameras) {
         setCameras(cachedCameras);
@@ -114,19 +96,6 @@ export default function CameraApprovalOverview() {
 
     const unsub = onAuthStateChanged(auth, async (user) => {
       await bootstrap(user);
-=======
-      try {
-        const snap = await getDocs(collection(db, "cameras"));
-        setCameras(
-          snap.docs.map((docSnap) => ({
-            id: docSnap.id,
-            ...docSnap.data(),
-          }))
-        );
-      } finally {
-        setLoading(false);
-      }
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
     });
 
     return () => unsub();
@@ -173,26 +142,15 @@ export default function CameraApprovalOverview() {
           </div>
 
           <div className="app-card p-5 flex flex-wrap gap-3">
-<<<<<<< HEAD
             <Link href="/dashboard/admin/cameras/pending" className="app-button">
               Review Pending Cameras
             </Link>
             <Link
-=======
-            <a href="/dashboard/admin/cameras/pending" className="app-button">
-              Review Pending Cameras
-            </a>
-            <a
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
               href="/dashboard/admin/cameras/approved"
               className="px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50"
             >
               View Approved Cameras
-<<<<<<< HEAD
             </Link>
-=======
-            </a>
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
           </div>
 
           <div className="overflow-x-auto app-card">

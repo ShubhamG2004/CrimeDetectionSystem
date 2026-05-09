@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { API_BASE_URL } from "@/lib/config";
 
 import IncidentMap from "@/components/IncidentMap";
 import Navbar from "@/components/Navbar";
@@ -86,7 +87,7 @@ export default function OperatorMapPage() {
         setError(null);
 
         const token = await user.getIdToken(true);
-        const response = await fetch("http://localhost:5000/api/operator/incidents", {
+        const response = await fetch(`${API_BASE_URL}/api/operator/incidents`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

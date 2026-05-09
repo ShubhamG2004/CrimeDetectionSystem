@@ -1,12 +1,8 @@
 ﻿"use client";
 
 import Link from "next/link";
-<<<<<<< HEAD
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
-=======
-import { usePathname } from "next/navigation";
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 import {
   LayoutDashboard,
   Radio,
@@ -17,15 +13,11 @@ import {
   Shield,
   Building2,
   UserCircle2,
-<<<<<<< HEAD
   MessageSquare,
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 } from "lucide-react";
 
 export default function AdminSidebar() {
   const pathname = usePathname();
-<<<<<<< HEAD
   const router = useRouter();
 
   useEffect(() => {
@@ -41,8 +33,6 @@ export default function AdminSidebar() {
       router.prefetch(route);
     });
   }, [router]);
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 
   // Keep overview active only on its exact route; other items support nested routes.
   const isActive = (href) =>
@@ -64,11 +54,7 @@ export default function AdminSidebar() {
     active ? "text-white" : "text-slate-600";
 
   return (
-<<<<<<< HEAD
     <aside className="sticky top-0 w-64 h-screen bg-white border-r border-slate-200 px-4 py-6 flex flex-col justify-between overflow-y-auto">
-=======
-    <aside className="w-64 h-screen bg-white border-r border-slate-200 px-4 py-6 flex flex-col justify-between">
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       
       {/* Top Section */}
       <div>
@@ -234,7 +220,6 @@ export default function AdminSidebar() {
               Operator Logs
             </span>
           </Link>
-<<<<<<< HEAD
 
           <Link
             href="/dashboard/admin/messages"
@@ -245,8 +230,6 @@ export default function AdminSidebar() {
               Messages
             </span>
           </Link>
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
         </nav>
       </div>
 

@@ -6,6 +6,7 @@ import { onAuthStateChanged } from "firebase/auth";
 import { collection, doc, getDoc, getDocs, query, where } from "firebase/firestore";
 import dynamic from "next/dynamic";
 import { auth, db } from "@/lib/firebase";
+import { API_BASE_URL } from "@/lib/config";
 import { ROLES } from "@/lib/roles";
 import Navbar from "@/components/Navbar";
 import FieldOperatorSidebar from "@/components/FieldOperatorSidebar";
@@ -59,7 +60,7 @@ export default function FieldOperatorAddCameraPage() {
       try {
         // Primary source: backend enforces creator-admin scoping.
         const token = await user.getIdToken();
-        const response = await fetch("http://localhost:5000/api/operator/police-stations", {
+        const response = await fetch(`${API_BASE_URL}/api/operator/police-stations`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -205,7 +206,7 @@ export default function FieldOperatorAddCameraPage() {
       };
 
       // Use backend API instead of direct Firestore write
-      const response = await fetch("http://localhost:5000/api/operator/submit-camera", {
+      const response = await fetch(`${API_BASE_URL}/api/operator/submit-camera`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

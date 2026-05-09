@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { API_BASE_URL } from "@/lib/config";
 import { ROLES } from "@/lib/roles";
 import Navbar from "@/components/Navbar";
 import FieldOperatorSidebar from "@/components/FieldOperatorSidebar";
@@ -69,7 +70,7 @@ export default function FieldOperatorDashboard() {
           try {
             // Fallback via backend Admin SDK path when client Firestore rules deny reads.
             const token = await user.getIdToken();
-            const res = await fetch("http://localhost:5000/api/cameras", {
+            const res = await fetch(`${API_BASE_URL}/api/cameras`, {
               headers: {
                 Authorization: `Bearer ${token}`,
               },

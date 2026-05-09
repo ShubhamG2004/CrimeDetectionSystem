@@ -148,10 +148,7 @@ router.put("/:cameraId", verifyToken, requireAdmin, async (req, res) => {
       latitude,
       longitude,
       active,
-<<<<<<< HEAD
       status,
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       assignedStationId,
     } = req.body;
 
@@ -184,7 +181,6 @@ router.put("/:cameraId", verifyToken, requireAdmin, async (req, res) => {
 
     if (active !== undefined) updates.active = Boolean(active);
 
-<<<<<<< HEAD
     if (status !== undefined) {
       const normalizedStatus = String(status).toLowerCase();
       const validStatuses = ["pending", "approved", "rejected"];
@@ -214,9 +210,6 @@ router.put("/:cameraId", verifyToken, requireAdmin, async (req, res) => {
         updates.approvedAt = null;
       }
     }
-
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
     if (assignedStationId !== undefined) {
       if (assignedStationId) {
         try {

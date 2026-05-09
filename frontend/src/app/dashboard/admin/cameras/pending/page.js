@@ -3,30 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
-<<<<<<< HEAD
 import { auth } from "@/lib/firebase";
-=======
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-  updateDoc,
-  doc,
-  serverTimestamp,
-  getDoc,
-} from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 import { ROLES } from "@/lib/roles";
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
 
-<<<<<<< HEAD
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 export default function PendingCamerasPage() {
   const router = useRouter();
   const checkedRef = useRef(false);
@@ -36,7 +19,6 @@ export default function PendingCamerasPage() {
   const [actionLoadingId, setActionLoadingId] = useState("");
 
   const fetchPendingCameras = async () => {
-<<<<<<< HEAD
     if (!auth.currentUser) return;
 
     const token = await auth.currentUser.getIdToken(true);
@@ -57,16 +39,6 @@ export default function PendingCamerasPage() {
         ...camera,
       }))
       .filter((camera) => (camera.status || "pending") === "pending")
-=======
-    const snap = await getDocs(
-      query(collection(db, "cameras"), where("status", "==", "pending"))
-    );
-    const camerasData = snap.docs
-      .map((docSnap) => ({
-        id: docSnap.id,
-        ...docSnap.data(),
-      }))
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       .sort((a, b) => {
         const aMs = a.createdAt?.toMillis?.() || 0;
         const bMs = b.createdAt?.toMillis?.() || 0;
@@ -104,7 +76,6 @@ export default function PendingCamerasPage() {
       setActionLoadingId(cameraId);
       const updates = {
         status: nextStatus,
-<<<<<<< HEAD
       };
 
       const token = await auth.currentUser.getIdToken(true);
@@ -126,43 +97,6 @@ export default function PendingCamerasPage() {
     } catch (error) {
       console.error("Failed to update camera status:", error);
       alert(error?.message || "Could not update camera status. Please retry.");
-=======
-        updatedAt: serverTimestamp(),
-      };
-
-      if (nextStatus === "approved") {
-        const operatorUid = camera.fieldOperatorId || camera.addedBy;
-        let operatorName = camera.fieldOperatorName || camera.addedByName || "Unknown";
-
-        if (!camera.fieldOperatorName && operatorUid) {
-          try {
-            const operatorDoc = await getDoc(doc(db, "field_operator", operatorUid));
-            if (operatorDoc.exists()) {
-              operatorName = operatorDoc.data().name || operatorName;
-            }
-          } catch (fetchError) {
-            console.error("Failed to fetch operator name during approval:", fetchError);
-          }
-        }
-
-        updates.approvedBy = auth.currentUser.uid;
-        updates.approvedByName = auth.currentUser.displayName || auth.currentUser.email || "Administrator";
-        updates.fieldOperatorName = operatorName;
-        updates.active = true;
-        updates.approvedAt = serverTimestamp();
-      } else {
-        updates.approvedBy = null;
-        updates.approvedByName = null;
-        updates.active = false;
-        updates.approvedAt = null;
-      }
-
-      await updateDoc(doc(db, "cameras", cameraId), updates);
-      await fetchPendingCameras();
-    } catch (error) {
-      console.error("Failed to update camera status:", error);
-      alert("Could not update camera status. Please retry.");
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
     } finally {
       setActionLoadingId("");
     }

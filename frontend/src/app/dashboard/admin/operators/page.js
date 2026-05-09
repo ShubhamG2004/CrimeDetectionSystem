@@ -1,74 +1,45 @@
-﻿"use client";
+"use client";
 
-<<<<<<< HEAD
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { ROLES } from "@/lib/roles";
 import { Shield, UserPlus, KeyRound, Camera, X, User } from "lucide-react";
-=======
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth, db } from "@/lib/firebase";
-import { ROLES } from "@/lib/roles";
-import {
-  collection,
-  getDocs,
-  updateDoc,
-  doc,
-} from "firebase/firestore";
-import { Shield, UserPlus, KeyRound, Camera } from "lucide-react";
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
 
-<<<<<<< HEAD
 const OPERATORS_PAGE_CACHE_KEY = "admin_operators_page_cache_v1";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
 
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
+const emptyForm = {
+  email: "",
+  password: "",
+  cameras: [],
+};
+
 export default function ManageOperators() {
   const router = useRouter();
-  const checkedRef = useRef(false);
   const dropdownRef = useRef(null);
 
   const [operators, setOperators] = useState([]);
   const [cameras, setCameras] = useState([]);
-
   const [showModal, setShowModal] = useState(false);
   const [editingUid, setEditingUid] = useState(null);
   const [resetUid, setResetUid] = useState(null);
   const [newPassword, setNewPassword] = useState("");
-<<<<<<< HEAD
   const [selectedOperator, setSelectedOperator] = useState(null);
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
-
   const [search, setSearch] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-<<<<<<< HEAD
   const [loading, setLoading] = useState(true);
   const [pageError, setPageError] = useState("");
   const [savingOperator, setSavingOperator] = useState(false);
   const [updatingStatusUid, setUpdatingStatusUid] = useState("");
   const [resettingPassword, setResettingPassword] = useState(false);
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
-
-  const emptyForm = {
-    email: "",
-    password: "",
-    cameras: [],
-  };
-
   const [form, setForm] = useState(emptyForm);
 
-<<<<<<< HEAD
   const readCachedData = () => {
     if (typeof window === "undefined") return null;
 
@@ -101,51 +72,45 @@ export default function ManageOperators() {
     }
   };
 
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
-  /* ================= MOUNTED STATE ================= */
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  /* ================= AUTH GUARD ================= */
   useEffect(() => {
-    if (checkedRef.current) return;
-    checkedRef.current = true;
+    let active = true;
 
-<<<<<<< HEAD
     const bootstrap = async (user) => {
-=======
-    const unsub = onAuthStateChanged(auth, async (user) => {
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
+      if (!active) return;
+
       if (!user) {
         router.replace("/login");
         return;
       }
 
-      const tokenResult = await user.getIdTokenResult(true);
-      const role = tokenResult.claims.role;
-
-      if (role !== ROLES.ADMIN) {
-        router.replace("/dashboard");
-        return;
-      }
-
-<<<<<<< HEAD
-      const cached = readCachedData();
-      if (cached) {
-        setOperators(cached.operators);
-        setCameras(cached.cameras);
-        setLoading(false);
-      }
-
       try {
-        await fetchOperatorsAndCameras();
+        const tokenResult = await user.getIdTokenResult(true);
+        const role = tokenResult.claims.role;
+
+        if (role !== ROLES.ADMIN) {
+          router.replace("/dashboard");
+          return;
+        }
+
+        const cached = readCachedData();
+        if (cached && active) {
+          setOperators(cached.operators);
+          setCameras(cached.cameras);
+          setLoading(false);
+        }
+
+        await fetchOperatorsAndCameras(user);
       } catch (error) {
         console.error("Failed to load operators page:", error);
-        setPageError(error?.message || "Unable to load operators right now.");
+        if (active) {
+          setPageError(error?.message || "Unable to load operators right now.");
+        }
       } finally {
-        setLoading(false);
+        if (active) setLoading(false);
       }
     };
 
@@ -153,18 +118,14 @@ export default function ManageOperators() {
       bootstrap(auth.currentUser);
     }
 
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      await bootstrap(user);
-=======
-      fetchOperators();
-      fetchCameras();
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
-    });
+    const unsub = onAuthStateChanged(auth, bootstrap);
 
-    return () => unsub();
+    return () => {
+      active = false;
+      unsub();
+    };
   }, [router]);
 
-  /* ================= CLOSE DROPDOWN ON CLICK OUTSIDE ================= */
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -178,12 +139,10 @@ export default function ManageOperators() {
     };
   }, []);
 
-  /* ================= FETCH OPERATORS ================= */
-<<<<<<< HEAD
-  const fetchOperatorsAndCameras = async () => {
-    if (!auth.currentUser) return;
+  const fetchOperatorsAndCameras = async (user = auth.currentUser) => {
+    if (!user) return;
 
-    const token = await auth.currentUser.getIdToken(true);
+    const token = await user.getIdToken(true);
     const headers = { Authorization: `Bearer ${token}` };
 
     const [operatorRes, cameraRes] = await Promise.all([
@@ -202,62 +161,38 @@ export default function ManageOperators() {
       throw new Error(cameraData?.message || "Failed to load cameras");
     }
 
-    setPageError("");
-
     const nextOperators = Array.isArray(operatorData?.operators)
       ? operatorData.operators
       : [];
     const nextCameras = (Array.isArray(cameraData) ? cameraData : []).map((cam) => ({
-      id: cam.cameraId,
+      id: cam.cameraId || cam.id,
       ...cam,
     }));
 
+    setPageError("");
     setOperators(nextOperators);
     setCameras(nextCameras);
     writeCachedData(nextOperators, nextCameras);
-=======
-  const fetchOperators = async () => {
-    const snap = await getDocs(collection(db, "operators"));
-    setOperators(
-      snap.docs.map((d) => ({ uid: d.id, ...d.data() }))
-    );
   };
 
-  /* ================= FETCH CAMERAS ================= */
-  const fetchCameras = async () => {
-    const snap = await getDocs(collection(db, "cameras"));
-    setCameras(
-      snap.docs.map((d) => ({
-        id: d.id,
-        ...d.data(),
-      }))
-    );
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
-  };
-
-  /* ================= ADD OPERATOR ================= */
   const addOperator = async () => {
     if (!form.email || !form.password || form.cameras.length === 0) {
       alert("All fields are required");
       return;
     }
 
-<<<<<<< HEAD
     try {
       setSavingOperator(true);
       const token = await auth.currentUser.getIdToken();
 
-      const res = await fetch(
-        `${API_BASE}/api/admin/create-operator`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(form),
-        }
-      );
+      const res = await fetch(`${API_BASE}/api/admin/create-operator`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(form),
+      });
 
       const data = await res.json();
       if (!res.ok) {
@@ -273,30 +208,8 @@ export default function ManageOperators() {
     } finally {
       setSavingOperator(false);
     }
-=======
-    const token = await auth.currentUser.getIdToken();
-
-    const res = await fetch(
-      "http://localhost:5000/api/admin/create-operator",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(form),
-      }
-    );
-
-    const data = await res.json();
-    if (!res.ok) return alert(data.message);
-
-    closeModal();
-    fetchOperators();
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   };
 
-  /* ================= EDIT OPERATOR ================= */
   const editOperator = (op) => {
     setEditingUid(op.uid);
     setForm({
@@ -313,7 +226,6 @@ export default function ManageOperators() {
       return;
     }
 
-<<<<<<< HEAD
     try {
       setSavingOperator(true);
       const token = await auth.currentUser.getIdToken(true);
@@ -342,20 +254,9 @@ export default function ManageOperators() {
     } finally {
       setSavingOperator(false);
     }
-=======
-    await updateDoc(doc(db, "operators", editingUid), {
-      cameras: form.cameras,
-      updatedAt: new Date(),
-    });
-
-    closeModal();
-    fetchOperators();
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   };
 
-  /* ================= TOGGLE STATUS ================= */
   const toggleStatus = async (uid, status) => {
-<<<<<<< HEAD
     try {
       setUpdatingStatusUid(uid);
       const token = await auth.currentUser.getIdToken(true);
@@ -385,84 +286,17 @@ export default function ManageOperators() {
     }
   };
 
-  const getCreatedAtMs = (createdAt) => {
-    if (!createdAt) return null;
-    if (typeof createdAt?.toMillis === "function") return createdAt.toMillis();
-    if (typeof createdAt?.seconds === "number") return createdAt.seconds * 1000;
-    if (typeof createdAt?._seconds === "number") return createdAt._seconds * 1000;
-    const parsed = new Date(createdAt).getTime();
-    return Number.isNaN(parsed) ? null : parsed;
-  };
-
-  const formatDateLabel = (value) => {
-    const ts = getCreatedAtMs(value);
-    if (!ts) return "-";
-
-    return new Date(ts).toLocaleString([], {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-=======
-    await updateDoc(doc(db, "operators", uid), {
-      status: status === "active" ? "inactive" : "active",
-    });
-    fetchOperators();
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
-  };
-
-  /* ================= RESET PASSWORD ================= */
   const resetPassword = async () => {
     if (!newPassword || newPassword.length < 6) {
       alert("Password must be at least 6 characters");
       return;
     }
 
-<<<<<<< HEAD
     try {
       setResettingPassword(true);
       const token = await auth.currentUser.getIdToken();
 
-      const res = await fetch(
-        `${API_BASE}/api/admin/reset-operator-password`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            uid: resetUid,
-            newPassword,
-          }),
-        }
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        alert(data.message || "Failed to reset password");
-        return;
-      }
-
-      alert("Password reset successfully");
-
-      setResetUid(null);
-      setNewPassword("");
-    } catch (error) {
-      console.error("Failed to reset password:", error);
-      alert("Could not reset password. Please retry.");
-    } finally {
-      setResettingPassword(false);
-    }
-=======
-    const token = await auth.currentUser.getIdToken();
-
-    const res = await fetch(
-      "http://localhost:5000/api/admin/reset-operator-password",
-      {
+      const res = await fetch(`${API_BASE}/api/admin/reset-operator-password`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -472,21 +306,24 @@ export default function ManageOperators() {
           uid: resetUid,
           newPassword,
         }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.message || "Failed to reset password");
+        return;
       }
-    );
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      alert(data.message);
-      return;
+      alert("Password reset successfully");
+      setResetUid(null);
+      setNewPassword("");
+    } catch (error) {
+      console.error("Failed to reset password:", error);
+      alert("Could not reset password. Please retry.");
+    } finally {
+      setResettingPassword(false);
     }
-
-    alert("Password reset successfully");
-
-    setResetUid(null);
-    setNewPassword("");
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   };
 
   const closeModal = () => {
@@ -497,12 +334,32 @@ export default function ManageOperators() {
     setDropdownOpen(false);
   };
 
-  /* ================= CAMERA NAME MAP ================= */
-<<<<<<< HEAD
+  const getTimestampMs = (value) => {
+    if (!value) return null;
+    if (typeof value?.toMillis === "function") return value.toMillis();
+    if (typeof value?.seconds === "number") return value.seconds * 1000;
+    if (typeof value?._seconds === "number") return value._seconds * 1000;
+
+    const parsed = new Date(value).getTime();
+    return Number.isNaN(parsed) ? null : parsed;
+  };
+
+  const formatDateLabel = (value, options = {}) => {
+    const ts = getTimestampMs(value);
+    if (!ts) return "-";
+
+    return new Date(ts).toLocaleString([], {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      ...options,
+    });
+  };
+
   const cameraMap = useMemo(
     () =>
       cameras.reduce((acc, cam) => {
-        acc[cam.id] = cam.name;
+        acc[cam.id] = cam.name || cam.cameraName || cam.id;
         return acc;
       }, {}),
     [cameras]
@@ -511,23 +368,12 @@ export default function ManageOperators() {
   const filteredCameras = useMemo(
     () =>
       cameras.filter((cam) => {
-        const name = (cam.name || "").toLowerCase();
-        const area = (cam.area || "").toLowerCase();
+        const name = (cam.name || cam.cameraName || "").toLowerCase();
+        const area = (cam.area || cam.location || "").toLowerCase();
         const q = search.toLowerCase();
         return name.includes(q) || area.includes(q);
       }),
     [cameras, search]
-=======
-  const cameraMap = cameras.reduce((acc, cam) => {
-    acc[cam.id] = cam.name;
-    return acc;
-  }, {});
-
-  const filteredCameras = cameras.filter(
-    (cam) =>
-      cam.name.toLowerCase().includes(search.toLowerCase()) ||
-      cam.area.toLowerCase().includes(search.toLowerCase())
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   );
 
   return (
@@ -538,7 +384,6 @@ export default function ManageOperators() {
         <Navbar title="Operator Management" />
 
         <div className="p-6">
-          {/* HEADER */}
           <div className="flex justify-between items-center mb-6">
             <div>
               <div className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -548,12 +393,9 @@ export default function ManageOperators() {
               <h2 className="text-2xl font-semibold text-slate-900 mt-2">
                 Operators
               </h2>
-<<<<<<< HEAD
               <p className="text-sm text-slate-500 mt-1">
                 Double-click an operator row to open full details.
               </p>
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
             </div>
             <button
               onClick={() => setShowModal(true)}
@@ -564,9 +406,7 @@ export default function ManageOperators() {
             </button>
           </div>
 
-          {/* TABLE */}
           <div className="overflow-x-auto app-card">
-<<<<<<< HEAD
             {loading && (
               <div className="p-4 border-b border-slate-200 text-sm text-slate-500">
                 Refreshing operators...
@@ -577,8 +417,7 @@ export default function ManageOperators() {
                 {pageError}
               </div>
             )}
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
+
             <table className="w-full">
               <thead className="bg-slate-100 border-b border-slate-200">
                 <tr>
@@ -592,7 +431,6 @@ export default function ManageOperators() {
 
               <tbody className="text-slate-800">
                 {operators.map((op) => (
-<<<<<<< HEAD
                   <tr
                     key={op.uid}
                     onDoubleClick={() => setSelectedOperator(op)}
@@ -601,31 +439,16 @@ export default function ManageOperators() {
                     <td className="p-4">{op.email}</td>
 
                     <td className="p-4">
-                      <ul className="space-y-1.5">
-                        {(op.cameras || []).map((id) => (
-                          <li
-=======
-                  <tr key={op.uid} className="border-t border-slate-100 hover:bg-slate-50/70 transition duration-150">
-                    <td className="p-4">{op.email}</td>
-
-                    <td className="p-4">
                       <div className="flex flex-wrap gap-1.5">
-                        {op.cameras?.map((id) => (
+                        {(op.cameras || []).map((id) => (
                           <span
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                             key={id}
                             className="px-2.5 py-1 bg-orange-50 text-orange-700 rounded-md text-xs font-medium"
                           >
                             {cameraMap[id] || id}
-<<<<<<< HEAD
-                          </li>
-                        ))}
-                      </ul>
-=======
                           </span>
                         ))}
                       </div>
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                     </td>
 
                     <td className="p-4 text-center">
@@ -633,36 +456,15 @@ export default function ManageOperators() {
                         className={`px-3 py-1.5 rounded-full text-xs font-semibold ${
                           op.status === "active"
                             ? "bg-orange-100 text-orange-800"
-<<<<<<< HEAD
                             : "bg-rose-100 text-rose-700"
-=======
-                            : "bg-slate-200 text-slate-700"
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                         }`}
                       >
-                        {op.status}
+                        {op.status || "inactive"}
                       </span>
                     </td>
 
                     <td className="p-4 text-center text-gray-600">
-<<<<<<< HEAD
-                      {(() => {
-                        const createdAtMs = getCreatedAtMs(op.createdAt);
-                        return mounted && createdAtMs
-                          ? new Date(createdAtMs).toLocaleDateString([], {
-=======
-                      {mounted && op.createdAt
-                        ? new Date(
-                            op.createdAt.seconds * 1000
-                          ).toLocaleDateString([], {
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
-                            year: "numeric",
-                            month: "short",
-                            day: "numeric"
-                          })
-<<<<<<< HEAD
-                          : "-";
-                      })()}
+                      {mounted ? formatDateLabel(op.createdAt) : "-"}
                     </td>
 
                     <td
@@ -674,26 +476,14 @@ export default function ManageOperators() {
                           event.stopPropagation();
                           editOperator(op);
                         }}
-=======
-                        : "-"}
-                    </td>
-
-                    <td className="p-3 text-center space-x-2">
-                      <button
-                        onClick={() => editOperator(op)}
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                         className="px-3 py-1.5 bg-slate-900 text-white text-xs rounded-md font-medium hover:bg-black transition"
                       >
                         Edit
                       </button>
 
                       <button
-<<<<<<< HEAD
                         onClick={(event) => {
                           event.stopPropagation();
-=======
-                        onClick={() => {
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                           setResetUid(op.uid);
                           setNewPassword("");
                         }}
@@ -703,20 +493,15 @@ export default function ManageOperators() {
                       </button>
 
                       <button
-<<<<<<< HEAD
                         onClick={(event) => {
                           event.stopPropagation();
                           toggleStatus(op.uid, op.status);
                         }}
                         disabled={updatingStatusUid === op.uid}
-=======
-                        onClick={() => toggleStatus(op.uid, op.status)}
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                         className={`px-3 py-1.5 text-white text-xs rounded-md font-medium transition ${
                           op.status === "active"
                             ? "bg-orange-600 hover:bg-orange-700"
                             : "bg-orange-600 hover:bg-orange-700"
-<<<<<<< HEAD
                         } disabled:opacity-60 disabled:cursor-not-allowed`}
                       >
                         {updatingStatusUid === op.uid
@@ -724,11 +509,6 @@ export default function ManageOperators() {
                           : op.status === "active"
                             ? "Disable"
                             : "Enable"}
-=======
-                        }`}
-                      >
-                        {op.status === "active" ? "Disable" : "Enable"}
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
                       </button>
                     </td>
                   </tr>
@@ -736,17 +516,14 @@ export default function ManageOperators() {
               </tbody>
             </table>
 
-            {operators.length === 0 && (
+            {!loading && operators.length === 0 && (
               <div className="p-8 text-center">
-                <p className="text-gray-600 font-medium">
-                  No operators found
-                </p>
+                <p className="text-gray-600 font-medium">No operators found</p>
               </div>
             )}
           </div>
         </div>
 
-        {/* ADD/EDIT MODAL */}
         {showModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm">
             <div className="w-full max-w-xl rounded-2xl border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.24)] overflow-hidden">
@@ -768,164 +545,140 @@ export default function ManageOperators() {
               </div>
 
               <div className="p-6">
-
-              <div className="space-y-5">
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Operator Email
-                  </label>
-                  <input
-                    className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-slate-800 focus:ring-2 focus:ring-slate-800/15 disabled:bg-slate-100 disabled:text-slate-500"
-                    placeholder="operator@example.com"
-                    value={form.email}
-                    disabled={!!editingUid}
-                    onChange={(e) =>
-                      setForm({ ...form, email: e.target.value })
-                    }
-                  />
-                </div>
-
-                {!editingUid && (
+                <div className="space-y-5">
                   <div>
                     <label className="mb-2 block text-sm font-medium text-slate-700">
-                      Temporary Password
+                      Operator Email
                     </label>
                     <input
-                      type="password"
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-slate-800 focus:ring-2 focus:ring-slate-800/15"
-                      placeholder="Enter password"
-                      value={form.password}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          password: e.target.value,
-                        })
-                      }
+                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-slate-800 focus:ring-2 focus:ring-slate-800/15 disabled:bg-slate-100 disabled:text-slate-500"
+                      placeholder="operator@example.com"
+                      value={form.email}
+                      disabled={!!editingUid}
+                      onChange={(e) => setForm({ ...form, email: e.target.value })}
                     />
                   </div>
-                )}
 
-                {/* SEARCHABLE DROPDOWN */}
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-slate-700">
-                    Assign Cameras
-                  </label>
-                  <div ref={dropdownRef} className="relative">
-                    <input
-                      className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-slate-800 focus:ring-2 focus:ring-slate-800/15"
-                      placeholder="Search cameras by name or area..."
-                      value={search}
-                      onChange={(e) => {
-                        setSearch(e.target.value);
-                        setDropdownOpen(true);
-                      }}
-                      onFocus={() => setDropdownOpen(true)}
-                    />
+                  {!editingUid && (
+                    <div>
+                      <label className="mb-2 block text-sm font-medium text-slate-700">
+                        Temporary Password
+                      </label>
+                      <input
+                        type="password"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-slate-800 focus:ring-2 focus:ring-slate-800/15"
+                        placeholder="Enter password"
+                        value={form.password}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            password: e.target.value,
+                          })
+                        }
+                      />
+                    </div>
+                  )}
 
-                    {dropdownOpen && (
-                      <div className="absolute z-10 mt-2 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
-                        <div className="p-2">
-                          {filteredCameras.length === 0 ? (
-                            <p className="p-2 text-slate-500 text-sm text-center">
-                              No cameras found
-                            </p>
-                          ) : (
-                            filteredCameras.map((cam) => (
-                              <label
-                                key={cam.id}
-                                className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer rounded-lg transition"
-                              >
-                                <input
-                                  type="checkbox"
-                                  className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
-                                  checked={form.cameras.includes(cam.id)}
-                                  onChange={(e) => {
-                                    const updated = e.target.checked
-                                      ? [...form.cameras, cam.id]
-                                      : form.cameras.filter(
-                                          (c) => c !== cam.id
-                                        );
-                                    setForm({
-                                      ...form,
-                                      cameras: updated,
-                                    });
-                                  }}
-                                />
-                                <div>
-                                  <p className="font-medium text-slate-800">{cam.name}</p>
-                                  <p className="text-xs text-slate-500">{cam.area}</p>
-                                </div>
-                              </label>
-                            ))
-                          )}
+                  <div>
+                    <label className="mb-2 block text-sm font-medium text-slate-700">
+                      Assign Cameras
+                    </label>
+                    <div ref={dropdownRef} className="relative">
+                      <input
+                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-slate-800 focus:ring-2 focus:ring-slate-800/15"
+                        placeholder="Search cameras by name or area..."
+                        value={search}
+                        onChange={(e) => {
+                          setSearch(e.target.value);
+                          setDropdownOpen(true);
+                        }}
+                        onFocus={() => setDropdownOpen(true)}
+                      />
+
+                      {dropdownOpen && (
+                        <div className="absolute z-10 mt-2 w-full max-h-56 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl">
+                          <div className="p-2">
+                            {filteredCameras.length === 0 ? (
+                              <p className="p-2 text-slate-500 text-sm text-center">
+                                No cameras found
+                              </p>
+                            ) : (
+                              filteredCameras.map((cam) => (
+                                <label
+                                  key={cam.id}
+                                  className="flex items-center gap-3 p-3 hover:bg-slate-50 cursor-pointer rounded-lg transition"
+                                >
+                                  <input
+                                    type="checkbox"
+                                    className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-500"
+                                    checked={form.cameras.includes(cam.id)}
+                                    onChange={(e) => {
+                                      const updated = e.target.checked
+                                        ? [...form.cameras, cam.id]
+                                        : form.cameras.filter((c) => c !== cam.id);
+                                      setForm({
+                                        ...form,
+                                        cameras: updated,
+                                      });
+                                    }}
+                                  />
+                                  <div>
+                                    <p className="font-medium text-slate-800">
+                                      {cam.name || cam.cameraName || cam.id}
+                                    </p>
+                                    <p className="text-xs text-slate-500">
+                                      {cam.area || cam.location || "Unknown area"}
+                                    </p>
+                                  </div>
+                                </label>
+                              ))
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {form.cameras.length > 0 && (
+                      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                        <p className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-slate-700">
+                          <Camera className="h-4 w-4" />
+                          Selected ({form.cameras.length})
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {form.cameras.map((id) => (
+                            <span
+                              key={id}
+                              className="px-2.5 py-1 bg-slate-200 text-slate-700 rounded-md text-xs font-medium"
+                            >
+                              {cameraMap[id] || id}
+                            </span>
+                          ))}
                         </div>
                       </div>
                     )}
                   </div>
-                  
-                  {/* Selected cameras preview */}
-                  {form.cameras.length > 0 && (
-                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3.5">
-                      <p className="mb-2 inline-flex items-center gap-1.5 text-sm font-medium text-slate-700">
-                        <Camera className="h-4 w-4" />
-                        Selected ({form.cameras.length})
-                      </p>
-<<<<<<< HEAD
-                      <div className="space-y-1.5">
-=======
-                      <div className="flex flex-wrap gap-1.5">
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
-                        {form.cameras.map((id) => {
-                          const cam = cameras.find(c => c.id === id);
-                          return (
-                            <span
-                              key={id}
-<<<<<<< HEAD
-                              className="block px-2.5 py-1 bg-slate-200 text-slate-700 rounded-md text-xs font-medium"
-=======
-                              className="px-2.5 py-1 bg-slate-200 text-slate-700 rounded-md text-xs font-medium"
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
-                            >
-                              {cam?.name || id}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </div>
-              </div>
 
-              {/* ACTIONS */}
-              <div className="mt-8 flex justify-end gap-3 border-t border-slate-200 pt-6">
-                <button
-                  onClick={closeModal}
-                  className="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={
-                    editingUid ? updateOperator : addOperator
-                  }
-<<<<<<< HEAD
-                  disabled={savingOperator}
-                  className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-black"
-                >
-                  {savingOperator ? "Saving..." : "Save Changes"}
-=======
-                  className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-black"
-                >
-                  Save Changes
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
-                </button>
-              </div>
+                <div className="mt-8 flex justify-end gap-3 border-t border-slate-200 pt-6">
+                  <button
+                    onClick={closeModal}
+                    className="rounded-xl border border-slate-300 px-5 py-2.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={editingUid ? updateOperator : addOperator}
+                    disabled={savingOperator}
+                    className="rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-black disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {savingOperator ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* RESET PASSWORD MODAL */}
         {resetUid && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm">
             <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.24)] overflow-hidden">
@@ -940,46 +693,37 @@ export default function ManageOperators() {
               </div>
 
               <div className="p-6">
+                <input
+                  type="password"
+                  className="mb-5 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-slate-800 focus:ring-2 focus:ring-slate-800/15"
+                  placeholder="New Password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
 
-              <input
-                type="password"
-                className="mb-5 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-slate-900 outline-none transition-all placeholder:text-slate-400 focus:border-slate-800 focus:ring-2 focus:ring-slate-800/15"
-                placeholder="New Password"
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-              />
-
-              <div className="flex justify-end gap-2">
-                <button
-                  onClick={() => {
-                    setResetUid(null);
-                    setNewPassword("");
-                  }}
-                  className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={resetPassword}
-<<<<<<< HEAD
-                  disabled={resettingPassword}
-                  className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
-                >
-                  {resettingPassword ? "Resetting..." : "Reset"}
-=======
-                  className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700"
-                >
-                  Reset
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
-                </button>
-              </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    onClick={() => {
+                      setResetUid(null);
+                      setNewPassword("");
+                    }}
+                    className="rounded-xl border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={resetPassword}
+                    disabled={resettingPassword}
+                    className="rounded-xl bg-orange-600 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {resettingPassword ? "Resetting..." : "Reset"}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         )}
-<<<<<<< HEAD
 
-        {/* OPERATOR DETAILS MODAL */}
         {selectedOperator && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/65 p-4 backdrop-blur-sm">
             <div className="w-full max-w-3xl rounded-2xl border border-slate-200 bg-white shadow-[0_20px_50px_rgba(15,23,42,0.24)] overflow-hidden">
@@ -990,8 +734,12 @@ export default function ManageOperators() {
                       <User className="h-3 w-3" />
                       Operator profile
                     </p>
-                    <h3 className="mt-3 text-xl font-semibold">{selectedOperator.email}</h3>
-                    <p className="mt-1 text-sm text-slate-300 break-all">UID: {selectedOperator.uid}</p>
+                    <h3 className="mt-3 text-xl font-semibold">
+                      {selectedOperator.email}
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-300 break-all">
+                      UID: {selectedOperator.uid}
+                    </p>
                   </div>
                   <button
                     onClick={() => setSelectedOperator(null)}
@@ -1007,32 +755,48 @@ export default function ManageOperators() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs text-slate-500">Role</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">{selectedOperator.role || "operator"}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">
+                      {selectedOperator.role || "operator"}
+                    </p>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs text-slate-500">Status</p>
-                    <p className={`mt-1 text-sm font-semibold ${
-                      (selectedOperator.status || "active") === "active"
-                        ? "text-orange-700"
-                        : "text-rose-700"
-                    }`}>
+                    <p
+                      className={`mt-1 text-sm font-semibold ${
+                        (selectedOperator.status || "active") === "active"
+                          ? "text-orange-700"
+                          : "text-rose-700"
+                      }`}
+                    >
                       {(selectedOperator.status || "active").toUpperCase()}
                     </p>
                   </div>
                   <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <p className="text-xs text-slate-500">Assigned Cameras</p>
-                    <p className="mt-1 text-sm font-semibold text-slate-900">{(selectedOperator.cameras || []).length}</p>
+                    <p className="mt-1 text-sm font-semibold text-slate-900">
+                      {(selectedOperator.cameras || []).length}
+                    </p>
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="rounded-xl border border-slate-200 p-4">
                     <p className="text-xs text-slate-500">Created At</p>
-                    <p className="mt-1 text-sm text-slate-900 font-medium">{formatDateLabel(selectedOperator.createdAt)}</p>
+                    <p className="mt-1 text-sm text-slate-900 font-medium">
+                      {formatDateLabel(selectedOperator.createdAt, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
                   </div>
                   <div className="rounded-xl border border-slate-200 p-4">
                     <p className="text-xs text-slate-500">Updated At</p>
-                    <p className="mt-1 text-sm text-slate-900 font-medium">{formatDateLabel(selectedOperator.updatedAt)}</p>
+                    <p className="mt-1 text-sm text-slate-900 font-medium">
+                      {formatDateLabel(selectedOperator.updatedAt, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
                   </div>
                 </div>
 
@@ -1049,8 +813,13 @@ export default function ManageOperators() {
                       {selectedOperator.cameras.map((cameraId) => {
                         const cam = cameras.find((entry) => entry.id === cameraId);
                         return (
-                          <li key={cameraId} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                            <p className="text-sm font-medium text-slate-900">{cam?.name || cam?.cameraName || cameraId}</p>
+                          <li
+                            key={cameraId}
+                            className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2"
+                          >
+                            <p className="text-sm font-medium text-slate-900">
+                              {cam?.name || cam?.cameraName || cameraId}
+                            </p>
                             <p className="text-xs text-slate-500 mt-0.5">
                               {cam?.area || cam?.location || "Unknown area"}
                               {cam?.latitude != null && cam?.longitude != null
@@ -1076,8 +845,6 @@ export default function ManageOperators() {
             </div>
           </div>
         )}
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       </div>
     </div>
   );

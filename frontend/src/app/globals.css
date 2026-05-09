@@ -9,6 +9,8 @@
   --accent: #0284c7;
   --accent-2: #10b981;
   --muted: #64748b;
+  --font-sora: "Segoe UI", Arial, sans-serif;
+  --font-jetbrains-mono: Consolas, "Courier New", monospace;
 }
 
 @theme inline {
@@ -43,7 +45,6 @@ body {
 
 @layer components {
   .app-shell {
-<<<<<<< HEAD
     @apply flex h-screen overflow-hidden text-slate-900;
   }
 
@@ -53,9 +54,6 @@ body {
 
   .app-shell > div {
     @apply min-w-0 flex-1 h-screen overflow-y-auto;
-=======
-    @apply min-h-screen text-slate-900;
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   }
 
   .app-card {

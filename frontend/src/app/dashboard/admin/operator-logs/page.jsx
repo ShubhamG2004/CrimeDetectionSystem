@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { ADMIN_API_BASE_URL } from "@/lib/config";
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
 
@@ -25,7 +26,7 @@ export default function OperatorLogs() {
         const token = await user.getIdToken();
 
         const res = await fetch(
-          "http://localhost:5000/api/admin/operator-logs?limit=100",
+          `${ADMIN_API_BASE_URL}/operator-logs?limit=100`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

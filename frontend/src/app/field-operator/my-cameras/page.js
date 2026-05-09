@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { API_BASE_URL } from "@/lib/config";
 import { ROLES } from "@/lib/roles";
 import Navbar from "@/components/Navbar";
 import FieldOperatorSidebar from "@/components/FieldOperatorSidebar";
@@ -36,7 +37,7 @@ export default function MyCamerasPage() {
       try {
         const token = await user.getIdToken();
         const response = await fetch(
-          "http://localhost:5000/api/operator/my-cameras",
+          `${API_BASE_URL}/api/operator/my-cameras`,
           {
             headers: {
               Authorization: `Bearer ${token}`,

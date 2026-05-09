@@ -5,15 +5,13 @@ import { useRouter } from "next/navigation";
 import { onAuthStateChanged } from "firebase/auth";
 import { doc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { ADMIN_API_BASE_URL } from "@/lib/config";
 import { ROLES } from "@/lib/roles";
 import Navbar from "@/components/Navbar";
 import AdminSidebar from "@/components/AdminSidebar";
 
-const API = "http://localhost:5000/api/admin";
-<<<<<<< HEAD
+const API = ADMIN_API_BASE_URL;
 const FIELD_OPERATORS_CACHE_KEY = "admin_field_operators_cache_v1";
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
 
 export default function FieldOperatorsPage() {
   const router = useRouter();
@@ -35,7 +33,6 @@ export default function FieldOperatorsPage() {
     password: "",
   });
 
-<<<<<<< HEAD
   const readCachedOperators = () => {
     if (typeof window === "undefined") return null;
 
@@ -65,8 +62,6 @@ export default function FieldOperatorsPage() {
     }
   };
 
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   const fetchFieldOperators = async () => {
     const token = await auth.currentUser.getIdToken();
     const res = await fetch(`${API}/field-operators`, {
@@ -78,24 +73,16 @@ export default function FieldOperatorsPage() {
       throw new Error(data?.message || "Failed to fetch field operators");
     }
 
-<<<<<<< HEAD
     const nextOperators = Array.isArray(data.operators) ? data.operators : [];
     setOperators(nextOperators);
     writeCachedOperators(nextOperators);
-=======
-    setOperators(Array.isArray(data.operators) ? data.operators : []);
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
   };
 
   useEffect(() => {
     if (checkedRef.current) return;
     checkedRef.current = true;
 
-<<<<<<< HEAD
     const bootstrap = async (user) => {
-=======
-    const unsub = onAuthStateChanged(auth, async (user) => {
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       if (!user) {
         router.replace("/login");
         return;
@@ -106,15 +93,12 @@ export default function FieldOperatorsPage() {
         return;
       }
 
-<<<<<<< HEAD
       const cachedOperators = readCachedOperators();
       if (cachedOperators) {
         setOperators(cachedOperators);
         setLoading(false);
       }
 
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
       try {
         await fetchFieldOperators();
       } catch (error) {
@@ -122,7 +106,6 @@ export default function FieldOperatorsPage() {
       } finally {
         setLoading(false);
       }
-<<<<<<< HEAD
     };
 
     if (auth.currentUser) {
@@ -131,8 +114,6 @@ export default function FieldOperatorsPage() {
 
     const unsub = onAuthStateChanged(auth, async (user) => {
       await bootstrap(user);
-=======
->>>>>>> 59bb784332c94aa99401ea1f39917d25316ef8f9
     });
 
     return () => unsub();
